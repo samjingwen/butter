@@ -1,0 +1,20 @@
+[package]
+name = "butter-boot"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Application bootstrap and checked shutdown for Butter"
+
+[dependencies]
+butter-core.workspace = true
+butter-web.workspace = true
+tokio = { workspace = true, features = ["net"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "time"] }
+
+[lints]
+workspace = true

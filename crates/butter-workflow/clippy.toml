@@ -1,0 +1,3 @@
+# Preserve the maintained persistence source's upstream lint thresholds.
+cognitive-complexity-threshold = 20
+too-many-lines-threshold = 150

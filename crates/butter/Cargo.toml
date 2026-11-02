@@ -1,0 +1,32 @@
+[package]
+name = "butter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Smooth startup and reusable capabilities for Rust applications"
+
+[features]
+default = ["web"]
+web = ["dep:butter-web", "dep:butter-boot"]
+data = ["dep:butter-data"]
+workflow = ["dep:butter-workflow", "data"]
+
+[dependencies]
+butter-core.workspace = true
+butter-web = { workspace = true, optional = true }
+butter-boot = { workspace = true, optional = true }
+butter-data = { workspace = true, optional = true }
+butter-workflow = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "net", "process", "time"] }
+
+[[example]]
+name = "hello"
+required-features = ["web"]
+
+[lints]
+workspace = true
