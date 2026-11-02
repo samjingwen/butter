@@ -1,0 +1,16 @@
+[package]
+name = "butter-data"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Owned PostgreSQL operations and transactions for Butter"
+
+[dependencies]
+batter-sqlx.workspace = true
+sqlx.workspace = true
+
+[lints]
+workspace = true

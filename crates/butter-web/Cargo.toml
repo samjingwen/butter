@@ -1,0 +1,16 @@
+[package]
+name = "butter-web"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Protected HTTP composition for Butter"
+
+[dependencies]
+axum.workspace = true
+batter-axum.workspace = true
+
+[lints]
+workspace = true
