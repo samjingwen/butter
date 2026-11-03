@@ -58,7 +58,7 @@ The related upstream foundation/model packages resolve from one immutable revisi
 The extension checks current lease authority, invokes required domain SQL and applies native completion in one protected transaction.
 Application generation, authorization, cancellation and accounting policy remain application-owned.
 An unconfirmed commit is uncertainty, not rollback proof or permission to repeat a provider action.
-See [source provenance](sources/PROVENANCE.md), [architecture](docs/architecture.md) and [verification](docs/verification.md).
+See [source provenance](provenance/PROVENANCE.md), [architecture](docs/architecture.md) and [verification](docs/verification.md).
 
 ## Check
 

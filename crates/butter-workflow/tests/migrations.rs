@@ -2100,13 +2100,13 @@ async fn ensure_schema_compatible_ignores_unrelated_sqlx_history_with_runledger_
 #[test]
 fn vendored_migration_copies_match_root_migrations() {
     let package = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let source_fixtures = package.join("../../sources");
-    let root_migrations = source_fixtures.join("migrations");
+    let provenance_fixtures = package.join("../../provenance");
+    let root_migrations = provenance_fixtures.join("migrations");
 
     assert_migration_dir_matches(&root_migrations, &package.join("migrations"));
     assert_migration_dir_matches(
         &root_migrations,
-        &source_fixtures.join("runledger-test-support/migrations"),
+        &provenance_fixtures.join("runledger-test-support/migrations"),
     );
 }
 
