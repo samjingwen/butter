@@ -73,6 +73,7 @@ Missing Docker is a failure, not a silently skipped workflow gate.
 On macOS Docker Desktop, select the intended socket explicitly if needed: `DOCKER_HOST=unix://$HOME/.docker/run/docker.sock bash scripts/check-workflow.sh`.
 
 Development is pinned to Rust 1.99.1, checked against the official stable manifest when bootstrapped.
+See [worktree caches](docs/worktrees.md) for safe, optional dependency-cache reuse when creating Worktrunk worktrees.
 Linux and macOS are the initial validation targets.
 The API is experimental and packages are not published to crates.io.
 No application migration, production deployment or package release is included.

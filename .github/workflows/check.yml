@@ -9,6 +9,47 @@ permissions:
   contents: read
 
 jobs:
+  worktree-cache:
+    name: Worktree cache (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: Install checksum-pinned Worktrunk 0.81.0
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, io, os, pathlib, platform, tarfile, urllib.request
+          artifacts = {
+              ("Linux", "x86_64"): ("x86_64-unknown-linux-musl", "0c253f216985ce9cd7b202a11606b5ce6aa934b1019fd1fbb9b7ce2b47b1c74a"),
+              ("Darwin", "arm64"): ("aarch64-apple-darwin", "b9c3f2f8071554cf88500466d65d35e18ad5edad5762479a1f14bcddd5ab7882"),
+              ("Darwin", "x86_64"): ("x86_64-apple-darwin", "211fa3585afa0ce243de0f007fbe2d8b86c5c88c85eda17d09311b32e8533714"),
+          }
+          target, checksum = artifacts[(platform.system(), platform.machine())]
+          url = f"https://github.com/max-sixty/worktrunk/releases/download/v0.81.0/worktrunk-{target}.tar.xz"
+          with urllib.request.urlopen(url, timeout=60) as response:
+              data = response.read()
+          if hashlib.sha256(data).hexdigest() != checksum:
+              raise SystemExit("Worktrunk checksum mismatch")
+          directory = pathlib.Path(os.environ["RUNNER_TEMP"]) / "butter-wt-bin"
+          directory.mkdir()
+          with tarfile.open(fileobj=io.BytesIO(data), mode="r:xz") as archive:
+              members = [m for m in archive.getmembers() if m.isfile() and pathlib.PurePosixPath(m.name).name == "wt"]
+              if len(members) != 1:
+                  raise SystemExit("Expected exactly one Worktrunk executable")
+              (directory / "wt").write_bytes(archive.extractfile(members[0]).read())
+          (directory / "wt").chmod(0o755)
+          with open(os.environ["GITHUB_PATH"], "a") as path:
+              path.write(str(directory) + "\n")
+          PY
+      - name: Check isolated cache copying without services
+        run: python3 scripts/test-worktree-cache.py
   quality:
     name: Quality (${{ matrix.os }})
     strategy:
