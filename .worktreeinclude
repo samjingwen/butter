@@ -1,0 +1,35 @@
+# Only native dev/test dependency caches, never all of target/ or CARGO_HOME.
+/target/debug/deps/*.rlib
+/target/debug/deps/*.rmeta
+/target/debug/deps/*.dylib
+/target/debug/deps/*.so
+/target/debug/deps/*.d
+/target/debug/.fingerprint/*/lib-*
+/target/debug/.fingerprint/*/dep-*
+/target/debug/.fingerprint/*/build-script-*
+/target/debug/.fingerprint/*/run-build-script-*
+/target/debug/.fingerprint/*/invoked.timestamp
+/target/debug/build/*/build-script-*
+/target/debug/build/*/build_script_*
+/target/debug/build/*/invoked.timestamp
+/target/debug/build/*/output
+/target/debug/build/*/root-output
+/target/debug/build/*/stderr
+/target/debug/build/*/out/**/*.rs
+/target/debug/build/*/out/**/*.h
+/target/debug/build/*/out/**/*.a
+/target/debug/build/*/out/**/*.o
+
+# Keep direct copy-ignored invocations safe too (not just the guarded hook).
+!**/.cargo*-lock
+!**/*.lock
+!**/*.sock
+!**/*.pid
+!**/.env
+!**/.env.*
+!**/credentials*
+!**/auth*
+!**/*.db
+!**/*.db-*
+!**/*.sqlite*
+!**/*.log

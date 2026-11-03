@@ -1,4 +1,6 @@
-/target/
+# Keep directories traversable so Worktrunk can allowlist individual cache files.
+/target/**
+!/target/**/
 /.worktrees/
 /.lavish/
 .DS_Store

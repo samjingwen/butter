@@ -1,0 +1,10 @@
+# pre-start blocks post-start hooks and --execute until the copy has finished.
+[pre-start]
+rust-cache = "python3 scripts/worktree-cache.py {{ base_worktree_path | default(primary_worktree_path, true) }}"
+
+[step.copy-ignored]
+exclude = [
+    "**/.cargo*-lock", "**/*.lock", "**/*.sock", "**/*.pid",
+    "**/.env", "**/.env.*", "**/credentials*", "**/auth*",
+    "**/*.db", "**/*.db-*", "**/*.sqlite*", "**/*.log",
+]
