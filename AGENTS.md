@@ -35,7 +35,8 @@ Document what cancellation and unconfirmed commit do not prove.
 
 ## Delivery
 
-Follow the ancestor dev-workspace instructions and shared delivery policy.
+Follow this repository's [change delivery policy](.opencode/instructions/change-delivery.md), not a parent-workspace delivery file.
+Do not initialize or restore the retired no-mistakes gate or its configuration.
 Use an isolated Worktrunk worktree, verify the actual source graph and review the intended diff before committing.
 No crates.io publication or deployment is configured or authorized by the bootstrap.
 The bootstrap targets Linux and macOS; do not claim platform validation without executed evidence.
