@@ -14,7 +14,7 @@ Reuse mechanisms, keep application policy explicit, and enforce important orderi
 - `crates/butter-boot`: consuming application bootstrap through checked shutdown.
 - `crates/butter-data`: upstream PostgreSQL transaction and session capabilities.
 - `crates/butter-workflow`: durable-work persistence and atomic completion.
-- `sources/`: upstream provenance, retained licenses and canonical migration fixtures, not an extra framework component.
+- `provenance/`: upstream provenance, retained licenses and canonical migration fixtures, not an extra framework component.
 
 ## Invariants
 

@@ -1,6 +1,6 @@
 # Maintained durable persistence
 
-Read `../../sources/PROVENANCE.md` and the root guide before editing.
+Read `../../provenance/PROVENANCE.md` and the root guide before editing.
 This is maintained source, not an immutable vendor directory or a replacement queue implementation.
 The maintained implementation belongs directly to `butter-workflow`; PostgreSQL schema contracts retain their native identities.
 

@@ -10,7 +10,7 @@ use std::{
 fn main() -> Result<(), Box<dyn Error>> {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let vendored_dir = manifest.join("migrations");
-    let canonical_dir = manifest.join("../../sources/migrations");
+    let canonical_dir = manifest.join("../../provenance/migrations");
     println!("cargo:rerun-if-changed={}", vendored_dir.display());
     if canonical_dir.exists() {
         println!("cargo:rerun-if-changed={}", canonical_dir.display());
@@ -25,7 +25,7 @@ pub fn enforce_migration_sync(canonical_dir: &Path, vendored_dir: &Path) {
 
     if canonical != vendored {
         panic!(
-            "butter-workflow/migrations is out of sync with sources/migrations; synchronize the bundled migration copies"
+            "butter-workflow/migrations is out of sync with provenance/migrations; synchronize the bundled migration copies"
         );
     }
 }
