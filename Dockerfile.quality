@@ -1,0 +1,56 @@
+FROM ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852 AS toolchain
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG RUSTUP_VERSION=1.28.2
+ARG RUSTUP_SHA256=20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c
+ARG WORKTRUNK_VERSION=0.81.0
+ARG WORKTRUNK_SHA256=0c253f216985ce9cd7b202a11606b5ce6aa934b1019fd1fbb9b7ce2b47b1c74a
+
+ENV CARGO_HOME=/opt/cargo \
+    RUSTUP_HOME=/opt/rustup \
+    PATH=/opt/cargo/bin:${PATH}
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        git \
+        libsqlite3-dev \
+        pkg-config \
+        python3 \
+        xz-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    curl --fail --location --show-error --silent \
+        "https://static.rust-lang.org/rustup/archive/${RUSTUP_VERSION}/x86_64-unknown-linux-gnu/rustup-init" \
+        --output /tmp/rustup-init; \
+    echo "${RUSTUP_SHA256}  /tmp/rustup-init" | sha256sum --check --strict; \
+    chmod +x /tmp/rustup-init; \
+    /tmp/rustup-init -y --no-modify-path --profile minimal \
+        --default-toolchain 1.99.1 --component clippy --component rustfmt; \
+    rm /tmp/rustup-init
+
+RUN set -eux; \
+    archive=/tmp/worktrunk.tar.xz; \
+    curl --fail --location --show-error --silent \
+        "https://github.com/max-sixty/worktrunk/releases/download/v${WORKTRUNK_VERSION}/worktrunk-x86_64-unknown-linux-musl.tar.xz" \
+        --output "${archive}"; \
+    echo "${WORKTRUNK_SHA256}  ${archive}" | sha256sum --check --strict; \
+    tar --extract --file "${archive}" --xz --directory /tmp \
+        worktrunk-x86_64-unknown-linux-musl/wt; \
+    install -m 0755 /tmp/worktrunk-x86_64-unknown-linux-musl/wt /usr/local/bin/wt; \
+    rm -rf "${archive}" /tmp/worktrunk-x86_64-unknown-linux-musl
+
+RUN useradd --create-home --shell /bin/bash --uid 10001 runner \
+    && chown -R runner:runner "${CARGO_HOME}" "${RUSTUP_HOME}"
+
+FROM toolchain AS quality
+
+USER runner
+WORKDIR /workspace
+COPY --chown=runner:runner . .
+
+RUN bash scripts/check.sh
+RUN python3 scripts/test-worktree-cache.py

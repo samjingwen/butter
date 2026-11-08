@@ -59,7 +59,7 @@ Butter Actuator remains experimental and unpublished until:
 - The endpoint and contributor contracts survive a real consumer integration.
 - Feature isolation passes for every supported combination.
 - Failure redaction and route-conflict behavior have adversarial tests.
-- Linux and macOS required checks pass on the exact reviewed implementation commit.
+- The documented macOS and pinned-Ubuntu local quality gates pass on the exact reviewed implementation commit.
 - Public documentation states the snapshot, cancellation and dependency-policy limitations.
 
 No crate publication, broad management API or compatibility guarantee is authorized by this plan.

@@ -76,7 +76,7 @@ Butter Security remains experimental and unpublished until:
 - The central extension contracts survive a real consumer integration.
 - Mandatory ordering and fail-closed defaults have adversarial tests.
 - Public documentation describes cancellation, persistence uncertainty and secret handling.
-- Linux and macOS required checks pass on the exact reviewed commit.
+- The documented macOS and pinned-Ubuntu local quality gates pass on the exact reviewed commit.
 - The public-repository boundary has been reviewed against the complete diff.
 
 No crate publication or compatibility promise is authorized by this plan.
