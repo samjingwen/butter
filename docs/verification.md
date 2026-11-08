@@ -3,9 +3,14 @@
 ## Reproducible commands
 
 Use the toolchain selected by `rust-toolchain.toml` and the Cargo-generated lockfile.
-Run `bash scripts/check.sh` for the ordinary framework gate and `bash scripts/check-workflow.sh` for disposable PostgreSQL persistence acceptance.
-CI runs the ordinary gate on Linux and macOS and the Docker-backed workflow gate on Linux.
-Configured CI is not evidence that a particular hosted execution passed.
+Run `bash scripts/check.sh` for the host ordinary framework gate and `python3 scripts/test-worktree-cache.py` for the host Worktrunk cache-policy gate.
+Run `bash scripts/check-linux.sh` for both gates in digest-pinned Ubuntu 24.04 `linux/amd64`.
+Run `bash scripts/check-workflow.sh` for disposable PostgreSQL persistence acceptance.
+No remote CI workflow is configured, so exact-head local command results and the Hardlook review are the delivery evidence.
+
+On the maintained macOS delivery path, the workflow Rust test process runs on macOS while its owned PostgreSQL 18 fixtures run in Linux containers.
+The Ubuntu quality image runs compilation, Clippy, ordinary tests, doctests, rustdoc, feature graphs, HTTP smoke tests and Worktrunk cache tests.
+It intentionally does not run the main `butter-workflow` integration suite, so this sequence does not prove Linux execution of that Rust test process.
 
 The bootstrap's public HTTP tests use real loopback TCP, not an in-memory-only router mock.
 They cover startup readiness, application/Actuator responses, listener release, reserved-subtree refusal, occupied ports, response-construction deadlines, borrowed-wait cancellation, owner drop and graceful completion of admitted work.

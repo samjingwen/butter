@@ -76,4 +76,4 @@ Rustdoc and doctests cover each public extension contract.
 
 Tests use synthetic identities, routes, keys and configuration.
 No private downstream repository, fixture, log, schema, endpoint or credential is copied into Butter.
-Public CI never receives access to a confidential downstream consumer.
+Local verification never receives access to a confidential downstream consumer.

@@ -31,6 +31,8 @@ Document what cancellation and unconfirmed commit do not prove.
 ## Commands
 
 - `bash scripts/check.sh`: formatting, strict Clippy, ordinary package tests, doctests and rustdoc.
+- `python3 scripts/test-worktree-cache.py`: native Worktrunk cache-policy regression tests.
+- `bash scripts/check-linux.sh`: ordinary quality and Worktrunk cache tests in pinned Ubuntu 24.04 `linux/amd64`.
 - `bash scripts/check-workflow.sh`: imported persistence tests against owned disposable PostgreSQL 18 through Docker.
 - `cargo run -p butter --example hello --features web,actuator`: local loopback HTTP example.
 

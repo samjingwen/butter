@@ -72,11 +72,15 @@ See [source provenance](provenance/PROVENANCE.md), [architecture](docs/architect
 
 ```sh
 bash scripts/check.sh
+python3 scripts/test-worktree-cache.py
+bash scripts/check-linux.sh
 bash scripts/check-workflow.sh
 ```
 
-The first command checks formatting, strict Clippy, feature isolation, ordinary package tests, all doctests, rustdoc and real HTTP process smoke tests.
-The second runs the retained persistence suite against native test-harness-owned disposable PostgreSQL 18 through Docker.
+The first command checks formatting, strict Clippy, feature isolation, ordinary package tests, all doctests, rustdoc and real HTTP process smoke tests on the host.
+The second exercises Worktrunk cache policy on the host with disposable synthetic repositories.
+The third runs both gates in a digest-pinned Ubuntu 24.04 `linux/amd64` container.
+The fourth runs the retained persistence suite against native test-harness-owned disposable PostgreSQL 18 through Docker.
 Missing Docker is a failure, not a silently skipped workflow gate.
 On macOS Docker Desktop, select the intended socket explicitly if needed: `DOCKER_HOST=unix://$HOME/.docker/run/docker.sock bash scripts/check-workflow.sh`.
 
