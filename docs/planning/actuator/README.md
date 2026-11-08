@@ -2,9 +2,10 @@
 
 ## Status
 
-Butter Actuator is a proposed framework capability and is not implemented.
-These documents define the component boundary, endpoint model, health semantics, feature graph, compatibility transition and acceptance gates for review before source scaffolding begins.
-They do not claim that the current bootstrap serves Actuator endpoints.
+This is the accepted design record for Butter Actuator.
+The generic core and explicitly attached Boot HTTP integration are now implemented together; see [current usage](../../actuator.md).
+The remaining consumer-validation phase is not established by this framework implementation, and the API remains experimental and unpublished.
+The documents below retain the original design language and acceptance requirements, not evidence of downstream runtime acceptance.
 
 ## Objective
 
@@ -55,9 +56,10 @@ It does not make a successful health response proof that a later request, depend
 The references were reviewed on 2026-11-08.
 They inform component separation and endpoint conventions, but Butter's public contracts remain Rust-specific.
 
-## Review questions
+## Implementation decisions
 
-- Whether the first internal operation catalog should use object-safe erased readers or an enum covering only built-in endpoints.
-- Whether contributor registration should return a typed local diagnostics handle or expose diagnostics through the running Actuator owner.
+- The deterministic catalog covers only the three built-in health views, without arbitrary endpoint registration.
+- Contributor registration returns a typed local diagnostics handle retaining the last concrete failure separately from sanitized monitor snapshots.
+- Repeated Boot attachment returns a construction error.
 
 No public API should be stabilized until the feature-isolation matrix and a real downstream integration have exercised the complete startup, health-change and shutdown path.

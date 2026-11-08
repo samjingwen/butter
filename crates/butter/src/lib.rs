@@ -1,9 +1,12 @@
 //! Rust application development, smooth like butter.
 //!
-//! The default `web` feature exposes `Application` and protected HTTP routing.
-//! Optional `data` and `workflow` features select PostgreSQL and durable persistence.
+//! Defaults select core only. Explicit `web` enables HTTP startup and routing.
+//! Optional `actuator`, `data` and `workflow` select operational health,
+//! PostgreSQL and durable persistence. Features alone expose no health routes.
 //! Applications keep their own domain models, authorization and business policy.
 
+#[cfg(feature = "actuator")]
+pub use butter_actuator as actuator;
 #[cfg(feature = "web")]
 pub use butter_boot::{Application, RunningApplication};
 pub use butter_core as core;

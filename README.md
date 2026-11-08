@@ -8,21 +8,24 @@ Inspired by Spring Boot's cohesive startup experience, built around explicit Rus
 ```sh
 git clone https://github.com/samjingwen/butter.git
 cd butter
-cargo run -p butter --example hello
+cargo run -p butter --example hello --features web,actuator
 ```
 
-The example prints its bound address and serves `GET /`, `/live` and `/ready` on `127.0.0.1:8080`.
+The example prints its bound address and serves `GET /` and explicitly attached Actuator health on `127.0.0.1:8080`.
+`GET` and bodyless `HEAD` are available at `/actuator/health`, `/actuator/health/liveness` and `/actuator/health/readiness`.
 Stop it with Ctrl-C or SIGTERM for checked graceful shutdown.
 To select another explicit listener, set `BUTTER_HTTP_ADDR`, for example `BUTTER_HTTP_ADDR=127.0.0.1:0` for an OS-assigned port.
 It does not read `.env` files, start a database, install a global logging subscriber or expose a public interface by default.
 
 ```rust,no_run
-use butter::{Application, web::{Router, routing::get}};
+use butter::{Application, actuator::Actuator, web::{Router, routing::get}};
 
 #[tokio::main]
 async fn main() -> Result<(), butter::core::BoxError> {
     let routes = Router::new().route("/", get(|| async { "Hello, Butter!" }));
-    let _completed = Application::new(routes).run().await?;
+    let _completed = Application::new(routes)
+        .actuator(Actuator::builder().build())?
+        .run().await?;
     Ok(())
 }
 ```
@@ -35,17 +38,20 @@ There is no runtime class scanning, DI container or hidden database initializati
 
 | Package | Bootstrap responsibility |
 | --- | --- |
-| `butter` | Feature-selected application facade; `web` is the default. |
+| `butter` | Feature-selected application facade; defaults select core only. |
 | `butter-core` | Lifecycle, configuration, deadlines, cancellation and cleanup primitives. |
+| `butter-actuator` | Transport-independent health with explicitly selected supervised contributors. |
 | `butter-boot` | Inert application assembly, startup, readiness and checked shutdown. |
 | `butter-web` | Protected HTTP routing with native Axum handlers. |
 | `butter-data` | PostgreSQL session/transaction capabilities and native SQLx queries. |
 | `butter-workflow` | Maintained durable persistence with atomic domain/job completion. |
 
-Enable `data` or `workflow` explicitly on the facade when needed.
-The minimal `butter` build with default features disabled selects only core primitives; HTTP-only applications do not inherit SQLx or workflow persistence.
-`butter-actuator`, `butter-security`, `butter-storage`, `butter-observability` and `butter-test` are intended component names, not implemented packages in this bootstrap.
-The proposed Actuator architecture and optional feature transition are documented in the [Actuator planning index](docs/planning/actuator/README.md).
+Enable `web`, `actuator`, `data` or `workflow` explicitly on the facade when needed; `workflow` implies `data`.
+`actuator` alone selects no HTTP stack, and HTTP-only applications do not inherit SQLx or workflow persistence.
+Even with `web,actuator` compiled, routes require explicit `Application::actuator(...)` attachment.
+The removed framework `/live` and `/ready` paths have no aliases; consumers must migrate their health-check paths with their Butter revision.
+See [Actuator usage and compatibility](docs/actuator.md) and the [accepted design](docs/planning/actuator/README.md).
+`butter-security`, `butter-storage`, `butter-observability` and `butter-test` remain intended component names, not implemented packages.
 The proposed Butter Security architecture is documented in the [security planning index](docs/planning/security/README.md).
 Worker-runtime integration is also pending; the workflow package currently implements persistence and atomic composition, not automatic worker startup.
 

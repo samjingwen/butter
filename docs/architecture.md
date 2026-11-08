@@ -9,7 +9,10 @@ Introduce abstractions for actual responsibilities and invariants, not to give e
 ## Dependency direction
 
 The application consumes the `butter` facade or a specific component.
-`butter-boot` composes core and web, while core never depends on web, data or workflow.
+`butter-boot` composes core and web, while core never depends on Actuator, web, data or workflow.
+`butter-actuator` depends only on core and owns health operations, aggregation and contributor plans.
+Boot's optional `actuator` feature provides HTTP mapping; `butter-web` remains independent of Actuator.
+The facade has empty defaults and forwards `actuator` to Boot only when `web` has already selected Boot.
 `butter-data` exposes owned PostgreSQL operations and native SQLx without inventing an ORM or universal repository.
 `butter-workflow` directly owns the adopted persistence implementation and its completion extension; its durable model types remain a pinned upstream dependency.
 There is one resolved SQLx graph, so data scopes and workflow operations use the same types.
@@ -20,8 +23,25 @@ There is one resolved SQLx graph, so data scopes and workflow operations use the
 `start` validates HTTP assembly before binding, registers the bound listener under protected startup, and returns only after component readiness.
 `start_with_signals` explicitly adds process-level SIGINT/SIGTERM ownership; plain `start` does not change process signal handling.
 `run` is the process-entrypoint convenience that starts with those signals and awaits checked completion.
-Applications cannot replace `/live` or `/ready` through guarded routes.
-The bootstrap's readiness currently means application approval, a running driver and initialized HTTP component, not a fabricated dependency-health claim.
+No health routes are exposed unless `Application::actuator(...)` explicitly attaches an inert plan.
+Attachment reserves the complete `/actuator` subtree through upstream route-inventory overlap checks before binding.
+The removed framework `/live` and `/ready` routes have no aliases and are no longer reserved.
+Lifecycle readiness means application approval, a running driver and initialized components, not a fabricated dependency-health claim.
+
+Actuator registers ordinary core `HealthMonitor` components through protected registration.
+Each monitor acknowledges startup before its first probe completes, so startup can succeed with readiness still unavailable.
+Liveness never reads external contributors; readiness includes only contributors explicitly assigned to it, while overall health includes all contributors.
+Endpoint reads synchronously aggregate bounded in-memory observations and read lifecycle last so an observed drain overrides earlier successes.
+Unknown, failure, timeout, staleness and writer stop all contribute `DOWN`.
+Boot maps sanitized typed results to fixed JSON, HTTP 200/503 and `Cache-Control: no-store`.
+
+The generic web `PublicReadSubtree` extension fills an upstream composition gap without adopting upstream source or introducing Actuator semantics into web.
+It uses an upstream validation-only route group to reserve a subtree, then dispatches application paths through the sealed upstream boundary client.
+Public routes use upstream operational observation, while application dispatch retains the existing observer after its own routing has matched the correct route template.
+Both paths emit one completion with the same server correlation used in their responses.
+Its assembled type exposes only supervised registration, never a router escape.
+Concrete contributor failures live in a separate trusted diagnostics capability, not in endpoint reader snapshots, including during concurrent replacement.
+No request read formats a retained cause or destroys an application error value.
 
 `RunningApplication` retains native running ownership and exposes read-only status and completion observation.
 Cancelling a borrowed `wait` does not cancel the driver.

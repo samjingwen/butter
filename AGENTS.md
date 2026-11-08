@@ -10,6 +10,7 @@ Reuse mechanisms, keep application policy explicit, and enforce important orderi
 
 - `crates/butter`: feature-selected public facade and runnable example.
 - `crates/butter-core`: upstream lifecycle, settings and operation primitives.
+- `crates/butter-actuator`: transport-independent health aggregation and supervised contributor plans.
 - `crates/butter-web`: protected HTTP composition and native Axum interoperability.
 - `crates/butter-boot`: consuming application bootstrap through checked shutdown.
 - `crates/butter-data`: upstream PostgreSQL transaction and session capabilities.
@@ -18,7 +19,7 @@ Reuse mechanisms, keep application policy explicit, and enforce important orderi
 
 ## Invariants
 
-Keep core independent of web, data and workflow.
+Keep core independent of Actuator, web, data and workflow, and web independent of Actuator.
 Do not implement another async runtime, database engine, queue or identity provider.
 An upstream dependency and a maintained source import are different ownership choices, not interchangeable branding.
 Retain upstream licenses, provenance and failure tests when adopting source.
@@ -31,7 +32,7 @@ Document what cancellation and unconfirmed commit do not prove.
 
 - `bash scripts/check.sh`: formatting, strict Clippy, ordinary package tests, doctests and rustdoc.
 - `bash scripts/check-workflow.sh`: imported persistence tests against owned disposable PostgreSQL 18 through Docker.
-- `cargo run -p butter --example hello`: local loopback HTTP example.
+- `cargo run -p butter --example hello --features web,actuator`: local loopback HTTP example.
 
 ## Delivery
 

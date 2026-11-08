@@ -9,13 +9,15 @@ publish.workspace = true
 description = "Smooth startup and reusable capabilities for Rust applications"
 
 [features]
-default = ["web"]
+default = []
 web = ["dep:butter-web", "dep:butter-boot"]
 data = ["dep:butter-data"]
 workflow = ["dep:butter-workflow", "data"]
+actuator = ["dep:butter-actuator", "butter-boot?/actuator"]
 
 [dependencies]
 butter-core.workspace = true
+butter-actuator = { workspace = true, optional = true }
 butter-web = { workspace = true, optional = true }
 butter-boot = { workspace = true, optional = true }
 butter-data = { workspace = true, optional = true }
@@ -26,7 +28,7 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", 
 
 [[example]]
 name = "hello"
-required-features = ["web"]
+required-features = ["web", "actuator"]
 
 [lints]
 workspace = true

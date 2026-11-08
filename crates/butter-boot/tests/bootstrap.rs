@@ -36,19 +36,31 @@ async fn request(address: SocketAddr, path: &str) -> String {
 }
 
 #[tokio::test]
-async fn start_serves_application_and_probes_then_shutdown_releases_the_listener() {
+async fn start_serves_application_without_implicit_probes_then_shutdown_releases_the_listener() {
     let running = Application::new(Router::new().route("/", get(|| async { "hello butter" })))
         .bind(loopback())
         .start()
         .await
         .expect("start application");
     let address = running.address();
-    for path in ["/", "/live", "/ready"] {
+    for path in ["/"] {
         let response = request(address, path).await;
         assert!(response.starts_with("HTTP/1.1 200"), "{path}: {response}");
         if path == "/" {
             assert!(response.ends_with("hello butter"));
         }
+    }
+    for path in [
+        "/live",
+        "/ready",
+        "/actuator/health",
+        "/actuator/health/liveness",
+        "/actuator/health/readiness",
+    ] {
+        assert!(
+            request(address, path).await.starts_with("HTTP/1.1 404"),
+            "{path}"
+        );
     }
     running.shutdown().await.expect("checked shutdown");
     assert!(
@@ -59,7 +71,7 @@ async fn start_serves_application_and_probes_then_shutdown_releases_the_listener
 
 #[tokio::test]
 async fn cancelling_a_borrowed_wait_does_not_stop_the_application() {
-    let running = Application::new(Router::new())
+    let running = Application::new(Router::new().route("/", get(|| async { "alive" })))
         .bind(loopback())
         .start()
         .await
@@ -70,7 +82,7 @@ async fn cancelling_a_borrowed_wait_does_not_stop_the_application() {
             .is_err()
     );
     assert!(
-        request(running.address(), "/ready")
+        request(running.address(), "/")
             .await
             .starts_with("HTTP/1.1 200")
     );
@@ -98,7 +110,7 @@ async fn dropping_the_owner_requests_drain_and_the_observer_retains_completion()
 }
 
 #[tokio::test]
-async fn startup_refuses_foreign_ports_and_reserved_probe_routes() {
+async fn startup_refuses_foreign_ports_and_legacy_paths_are_ordinary_application_routes() {
     let foreign = tokio::net::TcpListener::bind(loopback())
         .await
         .expect("own blocker");
@@ -112,17 +124,24 @@ async fn startup_refuses_foreign_ports_and_reserved_probe_routes() {
     );
     assert_eq!(foreign.local_addr().expect("blocker remains open"), address);
     for path in ["/live", "/ready"] {
-        let result = Application::new(Router::new().route(path, get(|| async { "forged probe" })))
-            .bind(loopback())
-            .start()
-            .await;
-        assert!(result.is_err(), "application cannot replace {path}");
+        let result =
+            Application::new(Router::new().route(path, get(|| async { "application route" })))
+                .bind(loopback())
+                .start()
+                .await;
+        let running = result.expect("legacy paths are no longer reserved");
+        assert!(
+            request(running.address(), path)
+                .await
+                .ends_with("application route")
+        );
+        running.shutdown().await.expect("shutdown");
     }
 }
 
 #[tokio::test]
 async fn request_construction_deadline_is_enforced_by_the_protected_boundary() {
-    let router = Router::new().route(
+    let router = Router::new().route("/", get(|| async { "healthy" })).route(
         "/slow",
         get(|| async {
             std::future::pending::<()>().await;
@@ -143,7 +162,7 @@ async fn request_construction_deadline_is_enforced_by_the_protected_boundary() {
         "{response}"
     );
     assert!(
-        request(running.address(), "/ready")
+        request(running.address(), "/")
             .await
             .starts_with("HTTP/1.1 200")
     );

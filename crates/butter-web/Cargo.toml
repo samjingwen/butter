@@ -9,6 +9,7 @@ publish.workspace = true
 description = "Protected HTTP composition for Butter"
 
 [dependencies]
+butter-core.workspace = true
 axum.workspace = true
 batter-axum.workspace = true
 

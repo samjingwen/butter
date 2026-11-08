@@ -11,15 +11,16 @@ use butter_core::{
     operation::OperationOwner,
     startup::{ApplicationError, Startup},
 };
-use butter_web::{
-    HttpBoundary, ProbePath, ReadinessPolicy, RequestPolicy, ResponseConstructionBudget, Router,
-};
+use butter_web::{HttpBoundary, RequestPolicy, ResponseConstructionBudget, Router};
 use std::{net::SocketAddr, time::Duration};
+
+#[cfg(feature = "actuator")]
+mod actuator;
 
 /// Inert HTTP application configuration. Construction performs no I/O.
 ///
-/// `/live` and `/ready` are reserved outside application admission. Conflicting
-/// routes fail assembly before a listener is bound. The default listener is
+/// No management routes are installed unless an Actuator is explicitly attached.
+/// Conflicting routes fail assembly before a listener is bound. The default listener is
 /// IPv4 loopback port 8080, never an automatically public interface.
 ///
 /// ```no_run
@@ -38,6 +39,8 @@ pub struct Application {
     routes: Router,
     address: SocketAddr,
     request_budget: ResponseConstructionBudget,
+    #[cfg(feature = "actuator")]
+    actuator: Option<butter_actuator::Actuator>,
 }
 
 impl Application {
@@ -50,6 +53,8 @@ impl Application {
             address: SocketAddr::from(([127, 0, 0, 1], 8080)),
             request_budget: ResponseConstructionBudget::new(Duration::from_secs(30))
                 .expect("constant response-construction budget is valid"),
+            #[cfg(feature = "actuator")]
+            actuator: None,
         }
     }
 
@@ -57,6 +62,17 @@ impl Application {
     pub fn bind(mut self, address: SocketAddr) -> Self {
         self.address = address;
         self
+    }
+
+    /// Explicitly attach operational health. Compilation alone installs no routes.
+    /// Repeated attachment is rejected without replacing the first plan.
+    #[cfg(feature = "actuator")]
+    pub fn actuator(mut self, actuator: butter_actuator::Actuator) -> Result<Self, BoxError> {
+        if self.actuator.is_some() {
+            return Err(std::io::Error::other("Actuator already attached").into());
+        }
+        self.actuator = Some(actuator);
+        Ok(self)
     }
 
     /// Select an already validated response-construction budget.
@@ -94,6 +110,7 @@ impl Application {
             second,
             cleanup,
         )?);
+        #[cfg(feature = "actuator")]
         let lifecycle = supervisor.status();
         let admission = supervisor.operation_admission();
         let startup = Startup::protected(
@@ -102,14 +119,24 @@ impl Application {
             cleanup,
             async move |scope| {
                 scope.stage("http.assemble")?;
-                let http = HttpBoundary::new(RequestPolicy::new(admission, self.request_budget))
-                    .with_liveness(ProbePath::new("/live")?)?
-                    .with_readiness(
-                        ProbePath::new("/ready")?,
-                        ReadinessPolicy::lifecycle_only(lifecycle),
-                    )?
-                    .assemble(self.routes)
-                    .await?;
+                let policy = RequestPolicy::new(admission, self.request_budget);
+                #[cfg(feature = "actuator")]
+                let public = self
+                    .actuator
+                    .map(|plan| plan.register_in(scope, lifecycle))
+                    .transpose()?;
+                #[cfg(feature = "actuator")]
+                if let Some(view) = public {
+                    let http = actuator::routes(view)?
+                        .assemble(policy, self.routes)
+                        .await?;
+                    scope.stage("http.bind")?;
+                    let listener = tokio::net::TcpListener::bind(self.address).await?;
+                    let address = listener.local_addr()?;
+                    http.register_in(scope, "http", listener)?;
+                    return Ok::<_, ApplicationError>(address);
+                }
+                let http = HttpBoundary::new(policy).assemble(self.routes).await?;
                 scope.stage("http.bind")?;
                 let listener = tokio::net::TcpListener::bind(self.address).await?;
                 let address = listener.local_addr()?;
