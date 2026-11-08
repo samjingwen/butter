@@ -87,7 +87,8 @@ Wildcard origins combined with browser credentials are rejected.
 
 ## Probes
 
-Butter's current `/live` and `/ready` probes remain owned by the protected HTTP boundary until the proposed Actuator transition is implemented.
+Butter's former `/live` and `/ready` probes were removed by the Actuator transition without aliases.
+The explicitly attached Actuator health reads remain outside ordinary application admission under the protected HTTP boundary.
 The [Actuator plan](../actuator/README.md) would replace them with protected `/actuator/health` routes and retain minimal disclosure.
 Security-chain integration must not let an application replace whichever framework health routes the accepted implementation owns.
 

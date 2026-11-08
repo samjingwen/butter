@@ -2,6 +2,7 @@
 
 use butter::{
     Application,
+    actuator::Actuator,
     core::BoxError,
     web::{Router, routing::get},
 };
@@ -15,6 +16,7 @@ async fn main() -> Result<(), BoxError> {
     let routes = Router::new().route("/", get(|| async { "Smooth like butter.\n" }));
     let running = Application::new(routes)
         .bind(address)
+        .actuator(Actuator::builder().build())?
         .start_with_signals()
         .await?;
     println!("Listening on http://{}", running.address());

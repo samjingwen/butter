@@ -38,8 +38,13 @@ for signal in TERM INT; do
   [[ -n "$address" ]] || { printf 'No startup address was published.\n' >&2; exit 1; }
   [[ "$address" =~ ^127\.0\.0\.1:[0-9]+$ ]] || { printf 'Unexpected listener address.\n' >&2; exit 1; }
   [[ "$(curl --silent --show-error --fail --max-time 5 "http://$address/")" == 'Smooth like butter.' ]]
-  curl --silent --show-error --fail --max-time 5 "http://$address/live" >/dev/null
-  curl --silent --show-error --fail --max-time 5 "http://$address/ready" >/dev/null
+  for view in health health/liveness health/readiness; do
+    [[ "$(curl --silent --show-error --fail --max-time 5 "http://$address/actuator/$view")" == '{"status":"UP"}' ]]
+    curl --silent --show-error --fail --head --max-time 5 "http://$address/actuator/$view" >/dev/null
+  done
+  for removed in live ready; do
+    [[ "$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' "http://$address/$removed")" == 404 ]]
+  done
   kill -"$signal" "$pid"
   for _ in {1..100}; do
     kill -0 "$pid" 2>/dev/null || break
@@ -54,5 +59,5 @@ for signal in TERM INT; do
   fi
   wait "$pid"
   pid=
-  printf 'PASS: hello, live, ready and SIG%s shutdown\n' "$signal"
+  printf 'PASS: hello, Actuator GET/HEAD, removed legacy probes and SIG%s shutdown\n' "$signal"
 done

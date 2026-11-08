@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/butter",
     "crates/butter-core",
+    "crates/butter-actuator",
     "crates/butter-boot",
     "crates/butter-web",
     "crates/butter-data",
@@ -20,12 +21,14 @@ publish = false
 
 [workspace.dependencies]
 butter-core = { path = "crates/butter-core" }
+butter-actuator = { path = "crates/butter-actuator" }
 butter-web = { path = "crates/butter-web" }
 butter-boot = { path = "crates/butter-boot" }
 butter-data = { path = "crates/butter-data" }
 butter-workflow = { path = "crates/butter-workflow" }
 axum = "=0.8.9"
 tokio = "=1.54.1"
+tracing = "=0.1.44"
 sqlx = { version = "=0.9.0", features = ["runtime-tokio", "postgres", "uuid", "chrono", "macros", "migrate"] }
 # One immutable upstream graph. Only the persistence implementation needing
 # atomic-completion changes is maintained as local source.

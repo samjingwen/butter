@@ -5,7 +5,9 @@
 
 pub use axum as native;
 pub use axum::{extract, response, routing};
+mod public_reads;
 pub use batter_axum::{
     AdmittedRequest, BoundaryAssemblyError, GuardedRouter as Router, HttpBoundary, ProbePath,
-    ReadinessPolicy, RequestPolicy, ResponseConstructionBudget,
+    ReadinessPolicy, RequestPolicy, ResponseConstructionBudget, RouteInventory,
 };
+pub use public_reads::{PublicReadError, PublicReadHttp, PublicReadSubtree};

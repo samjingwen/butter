@@ -1,23 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-minimal=$(cargo tree -p butter --no-default-features --locked --edges normal --prefix none --format '{p}')
-if grep -Eq '^(butter-(boot|web|data|workflow)|axum|sqlx|runledger-core) v' <<<"$minimal"; then
-  printf 'Minimal Butter unexpectedly selects an integration.\n' >&2
-  exit 1
-fi
-web=$(cargo tree -p butter --locked --edges normal --prefix none --format '{p}')
-if grep -Eq '^(butter-(data|workflow)|sqlx|runledger-core) v' <<<"$web"; then
-  printf 'HTTP-only Butter unexpectedly selects persistence.\n' >&2
-  exit 1
-fi
-workflow=$(cargo tree -p butter --no-default-features --features workflow --locked --edges normal --prefix none --format '{p}')
-grep -Eq '^butter-workflow v' <<<"$workflow"
-if grep -Eq '^runledger-(postgres|runtime) v' <<<"$workflow"; then
-  printf 'Workflow selects an extra native persistence/runtime implementation.\n' >&2
-  exit 1
-fi
-# An ambiguous SQLx selection makes this command fail; all components must share
-# the same native type identity, not independently resolved major versions.
+
+assert_absent() {
+  if grep -Eq "^($2) v" <<<"$1"; then
+    printf 'Feature/source isolation failed: forbidden integration selected.\n' >&2
+    exit 1
+  fi
+}
+assert_present() { grep -Eq "^$2 v" <<<"$1"; }
+for features in '' web data workflow actuator web,actuator web,data,actuator; do
+  args=(--no-default-features)
+  [[ -z "$features" ]] || args+=(--features "$features")
+  graph=$(cargo tree -p butter "${args[@]}" --locked --edges normal --prefix none --format '{p}')
+  assert_present "$graph" butter-core
+  case "$features" in
+    '') assert_absent "$graph" 'butter-(boot|web|actuator|data|workflow)|axum|sqlx|runledger-core' ;;
+    web) assert_present "$graph" butter-boot
+         assert_present "$graph" butter-web
+         assert_absent "$graph" 'butter-(actuator|data|workflow)|sqlx|runledger-core' ;;
+    data) assert_present "$graph" butter-data
+          assert_absent "$graph" 'butter-(boot|web|actuator|workflow)|axum|runledger-core' ;;
+    workflow) assert_present "$graph" butter-workflow
+              assert_present "$graph" butter-data
+              assert_absent "$graph" 'butter-(boot|web|actuator)|axum|runledger-(postgres|runtime)' ;;
+    actuator) assert_present "$graph" butter-actuator
+              assert_absent "$graph" 'butter-(boot|web|data|workflow)|axum|sqlx|runledger-core' ;;
+    web,actuator) assert_present "$graph" butter-boot
+                  assert_present "$graph" butter-actuator
+                  assert_absent "$graph" 'butter-(data|workflow)|sqlx|runledger-core' ;;
+    web,data,actuator) assert_present "$graph" butter-boot
+                       assert_present "$graph" butter-actuator
+                       assert_present "$graph" butter-data
+                       assert_absent "$graph" 'butter-workflow|runledger-core' ;;
+  esac
+  cargo check -p butter "${args[@]}" --locked
+done
+# Check real defaults, not only --no-default-features.
+defaults=$(cargo tree -p butter --locked --edges normal --prefix none --format '{p}')
+assert_absent "$defaults" 'butter-(boot|web|actuator|data|workflow)|axum|sqlx|runledger-core'
+for component in butter-core butter-actuator butter-web; do
+  graph=$(cargo tree -p "$component" --locked --edges normal --prefix none --format '{p}')
+  case "$component" in
+    butter-core) assert_absent "$graph" 'butter-(web|boot|actuator|data|workflow)|axum|sqlx' ;;
+    butter-actuator) assert_absent "$graph" 'butter-(web|boot|data|workflow)|axum|sqlx' ;;
+    butter-web) assert_absent "$graph" 'butter-(actuator|boot|data|workflow)|sqlx' ;;
+  esac
+done
+# Ambiguous native SQLx identities make this command fail.
 cargo tree --workspace --all-features --locked --invert sqlx --depth 1
-printf 'PASS: minimal, HTTP and workflow feature/source isolation\n'
+printf 'PASS: empty defaults, seven facade combinations and component/source isolation\n'
