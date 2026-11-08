@@ -45,6 +45,7 @@ There is no runtime class scanning, DI container or hidden database initializati
 Enable `data` or `workflow` explicitly on the facade when needed.
 The minimal `butter` build with default features disabled selects only core primitives; HTTP-only applications do not inherit SQLx or workflow persistence.
 `butter-security`, `butter-storage`, `butter-observability` and `butter-test` are intended component names, not implemented packages in this bootstrap.
+The proposed Butter Security architecture is documented in the [security planning index](docs/planning/security/README.md).
 Worker-runtime integration is also pending; the workflow package currently implements persistence and atomic composition, not automatic worker startup.
 
 ## Dependencies and source ownership
