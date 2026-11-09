@@ -14,6 +14,7 @@ It intentionally does not run the main `butter-workflow` integration suite, so t
 
 The bootstrap's public HTTP tests use real loopback TCP, not an in-memory-only router mock.
 They cover startup readiness, application/Actuator responses, listener release, reserved-subtree refusal, occupied ports, response-construction deadlines, borrowed-wait cancellation, owner drop and graceful completion of admitted work.
+They also cover protected initializer ordering, failed-startup rollback, cleanup after HTTP drain, bounded cleanup and checked cleanup-failure propagation.
 Actuator acceptance covers GET/HEAD JSON and headers, method rejection, query inertness, explicit attachment, feature-unified no-attachment, removed legacy routes, multiple readiness contributors, overall-only membership, outage/timeout recovery, blocked probes, local error retention and response redaction.
 Loopback regressions also cover trailing-slash subtree reservation and fallback isolation, application route templates on spans/completions, exactly one completion per request and consistent server correlation.
 Core-backed Actuator tests exercise every contributor state, exact freshness expiry, the lifecycle matrix, final lifecycle precedence, sequential sampling, cancellation and writer invalidation with controlled Tokio time.
