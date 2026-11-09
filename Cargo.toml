@@ -4,6 +4,7 @@ members = [
     "crates/butter",
     "crates/butter-core",
     "crates/butter-security",
+    "crates/butter-security-web",
     "crates/butter-actuator",
     "crates/butter-boot",
     "crates/butter-web",
@@ -23,6 +24,7 @@ publish = false
 [workspace.dependencies]
 butter-core = { path = "crates/butter-core" }
 butter-security = { path = "crates/butter-security" }
+butter-security-web = { path = "crates/butter-security-web" }
 butter-actuator = { path = "crates/butter-actuator" }
 butter-web = { path = "crates/butter-web" }
 butter-boot = { path = "crates/butter-boot" }

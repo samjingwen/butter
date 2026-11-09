@@ -3,9 +3,11 @@
 ## Status
 
 Phase 1 implements the transport-independent `butter-security` core.
-It provides credential-safe authentication contracts, immutable request-scoped contexts, ordered provider orchestration, fail-closed authorization and credential-free events.
-Web request processing, context persistence, sessions, CSRF and test support remain planned later slices.
-Enabling the core feature alone does not protect an HTTP route.
+Phase 2 implements the `butter-security-web` request-security spine and its explicit `butter-boot` attachment.
+Together they provide credential-safe authentication contracts, immutable request-scoped contexts, ordered providers, first-match web chains, fail-closed authorization and neutral HTTP failures.
+Context persistence, sessions, CSRF and dedicated test support remain planned later slices.
+Enabling a security feature alone does not protect an HTTP route.
+An application must build the policy and explicitly attach it through `Application::security`.
 
 ## Objective
 

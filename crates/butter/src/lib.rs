@@ -3,6 +3,7 @@
 //! Defaults select core only. Explicit `web` enables HTTP startup and routing.
 //! Optional `security`, `actuator`, `data` and `workflow` select application
 //! security, operational health, PostgreSQL and durable persistence.
+//! `security-web` explicitly selects the HTTP security integration.
 //! Features alone expose no routes or security policy.
 //! Applications keep their own domain models, authorization and business policy.
 
@@ -15,6 +16,8 @@ pub use butter_core as core;
 pub use butter_data as data;
 #[cfg(feature = "security")]
 pub use butter_security as security;
+#[cfg(feature = "security-web")]
+pub use butter_security_web as security_web;
 #[cfg(feature = "web")]
 pub use butter_web as web;
 #[cfg(feature = "workflow")]

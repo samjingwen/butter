@@ -72,15 +72,19 @@ The framework must preserve that distinction internally while allowing neutral e
 Web credential extractors translate request material into authentication requests.
 Extraction is separate from verification so custom transports can reuse providers and custom providers can reuse extractors.
 
-The initial web package should support extension contracts for:
+The initial web package supplies an extractor contract and a strict bounded bearer adapter.
+Applications can implement API-key and other header adapters through the same contract.
+Cookie credentials remain part of the stateful browser-security phase.
+
+The planned mechanism set includes:
 
 - `Authorization` bearer credentials.
 - Cookie credentials.
 - API key headers.
 - Explicit request-body login endpoints implemented by applications.
 
-Multiple simultaneous credential sources are rejected by default.
-An application may configure a deterministic collision policy only when it can demonstrate that the combination is safe.
+Multiple simultaneous credential sources are rejected by the implemented web spine.
+No weaker collision policy is exposed by the initial builder.
 
 ## Existing context and reauthentication
 

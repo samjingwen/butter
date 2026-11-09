@@ -4,6 +4,8 @@
 
 The web security package composes request security as one validated boundary around application routes.
 It uses native Axum handlers and Tower services rather than maintaining another HTTP implementation.
+The implemented Boot attachment applies the validated boundary after application route construction and before Butter's protected HTTP assembly.
+Compilation or feature selection alone installs no chain.
 
 ## Request normalization
 
@@ -55,6 +57,10 @@ The initial stage anchors are:
 The builder rejects duplicate extension identifiers, impossible dependencies and placement that moves authorization before authentication.
 Mandatory request cleanup and exception translation cannot be replaced by application extensions.
 
+The Phase 2 spine exposes these names as a fixed framework-owned order.
+The exploit-protection, session-transition and persistence anchors are reserved for later reviewed slices and perform no invented policy in Phase 2.
+General before-and-after extension insertion remains deferred; current extensions enter through dedicated matcher, extractor, manager and failure-handler contracts.
+
 ## Exception translation
 
 Exception translation maps typed security failures into the configured response strategy.
@@ -88,9 +94,9 @@ Wildcard origins combined with browser credentials are rejected.
 ## Probes
 
 Butter's former `/live` and `/ready` probes were removed by the Actuator transition without aliases.
-The explicitly attached Actuator health reads remain outside ordinary application admission under the protected HTTP boundary.
-The [Actuator plan](../actuator/README.md) would replace them with protected `/actuator/health` routes and retain minimal disclosure.
-Security-chain integration must not let an application replace whichever framework health routes the accepted implementation owns.
+Explicitly attached Actuator health reads remain outside ordinary application admission and application security chains under the protected HTTP boundary.
+The accepted Actuator implementation owns `/actuator/health` and its liveness and readiness children with minimal disclosure.
+Security-chain integration does not let an application replace those framework routes.
 
 ## Safe diagnostics
 

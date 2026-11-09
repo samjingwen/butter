@@ -19,9 +19,10 @@ It does not depend on Axum, Tower, SQLx, cookies, JWT libraries or a persistence
 
 ### `butter-security-web`
 
-The planned web package integrates core security contracts with `butter-web`, Axum and Tower.
-It owns request matchers, security-chain selection, credential extraction, request-scoped context, exception translation, exploit-protection composition and framework-validated stage ordering.
-It must preserve Butter's existing HTTP admission, response-construction deadline, liveness, readiness and graceful-shutdown contracts.
+The implemented web package integrates core security contracts with `butter-web`, Axum and Tower.
+It owns request matchers, security-chain selection, credential extraction, request-scoped context, exception translation and framework-owned stage anchors.
+The initial spine reserves exploit-protection, session-transition and context-persistence anchors without pretending to implement those later policies.
+Its explicit Boot attachment preserves Butter's existing HTTP admission, response-construction deadline, Actuator reads and graceful-shutdown contracts.
 
 ### `butter-security-test`
 
@@ -31,7 +32,8 @@ It is intended for development dependencies and must not make unsafe production 
 ## Dependency direction
 
 `butter-security` depends only on narrow foundational crates needed for async-safe types, secrecy and error contracts.
-`butter-security-web` depends on `butter-security`, `butter-core` and `butter-web`.
+`butter-security-web` depends on `butter-security` and `butter-web`.
+`butter-boot` optionally consumes the bridge only when the explicit `security-web` feature is selected.
 `butter-security-test` depends on the public security packages and test-only HTTP utilities.
 `butter-core` remains independent of every security package.
 `butter-data` and `butter-workflow` remain independent of security.
@@ -44,7 +46,7 @@ The security context is immutable after successful authentication and belongs to
 It contains authenticated identity, authorities, assurance information and non-secret details required for policy decisions.
 It never contains raw passwords, bearer tokens, session identifiers or API key values.
 
-The web integration stores the context in request extensions and exposes typed extractors.
+The web integration stores the context in request extensions for native Axum extraction.
 It does not use thread-local state because asynchronous Rust tasks can move between executor threads.
 Detached tasks do not inherit identity implicitly.
 An application must clone and pass an explicitly approved context when background work genuinely needs caller identity.
@@ -52,11 +54,12 @@ An application must clone and pass an explicitly approved context when backgroun
 ## Security-chain proxy
 
 One top-level security layer selects the first configured chain whose request matcher accepts the normalized request.
+The canonical `Application::security` attachment applies that layer after route construction and immediately before protected HTTP assembly.
 Each chain owns an isolated set of mechanisms and policies.
 The framework rejects ambiguous ordering, duplicate mandatory stages and configurations that can leave unmatched requests accidentally public.
 
 Public authorization means that a request does not require an authenticated principal.
-It does not bypass request normalization, safe headers, diagnostics or applicable exploit protection.
+It does not bypass request integrity, credential-conflict rejection or request-local context creation.
 A full security bypass is a separate exceptional operation and is not part of the initial public API.
 
 ## Framework-owned ordering
@@ -80,10 +83,11 @@ Request-owned sensitive material is dropped on every completion path, including 
 ## Build-time validation
 
 Security configuration is inert until built and performs no I/O during construction.
-The build step validates chain precedence, mandatory stages, route fallback, credential collision policy, CSRF decisions and handler completeness before a listener is bound.
+The Phase 2 build step validates unique priorities and identifiers, provable broad-before-narrow shadowing, explicit unmatched behavior, extractor and manager consistency, stage-component uniqueness and handler completeness before a listener is bound.
+CSRF completeness belongs to the later stateful browser-security build step.
 Invalid security composition is a startup error rather than a runtime warning.
 
-The built plan has a safe diagnostic representation that lists chain matchers, mechanisms and stage names without including credentials or application secrets.
+The built plan exposes safe chain identifiers, priorities, matcher descriptions and stage names without including credentials or application secrets.
 
 ## Application boundary
 

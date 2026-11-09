@@ -9,7 +9,7 @@ assert_absent() {
   fi
 }
 assert_present() { grep -Eq "^$2 v" <<<"$1"; }
-for features in '' security web data workflow actuator web,security web,actuator web,data,actuator; do
+for features in '' security web security-web data workflow actuator web,security web,actuator security-web,actuator web,data,actuator; do
   args=(--no-default-features)
   [[ -z "$features" ]] || args+=(--features "$features")
   graph=$(cargo tree -p butter "${args[@]}" --locked --edges normal --prefix none --format '{p}')
@@ -31,10 +31,19 @@ for features in '' security web data workflow actuator web,security web,actuator
     web,security) assert_present "$graph" butter-boot
                   assert_present "$graph" butter-web
                   assert_present "$graph" butter-security
+                   assert_absent "$graph" 'butter-(actuator|data|workflow)|sqlx|runledger-core' ;;
+    security-web) assert_present "$graph" butter-boot
+                  assert_present "$graph" butter-web
+                  assert_present "$graph" butter-security
+                  assert_present "$graph" butter-security-web
                   assert_absent "$graph" 'butter-(actuator|data|workflow)|sqlx|runledger-core' ;;
     web,actuator) assert_present "$graph" butter-boot
                    assert_present "$graph" butter-actuator
-                   assert_absent "$graph" 'butter-(security|data|workflow)|sqlx|runledger-core' ;;
+                    assert_absent "$graph" 'butter-(security|data|workflow)|sqlx|runledger-core' ;;
+    security-web,actuator) assert_present "$graph" butter-boot
+                           assert_present "$graph" butter-security-web
+                           assert_present "$graph" butter-actuator
+                           assert_absent "$graph" 'butter-(data|workflow)|sqlx|runledger-core' ;;
     web,data,actuator) assert_present "$graph" butter-boot
                        assert_present "$graph" butter-actuator
                        assert_present "$graph" butter-data
@@ -45,15 +54,18 @@ done
 # Check real defaults, not only --no-default-features.
 defaults=$(cargo tree -p butter --locked --edges normal --prefix none --format '{p}')
 assert_absent "$defaults" 'butter-(security|boot|web|actuator|data|workflow)|axum|sqlx|runledger-core'
-for component in butter-core butter-security butter-actuator butter-web; do
+for component in butter-core butter-security butter-security-web butter-actuator butter-web; do
   graph=$(cargo tree -p "$component" --locked --edges normal --prefix none --format '{p}')
   case "$component" in
     butter-core) assert_absent "$graph" 'butter-(security|web|boot|actuator|data|workflow)|axum|sqlx' ;;
     butter-security) assert_absent "$graph" 'butter-(core|web|boot|actuator|data|workflow)|axum|sqlx|runledger-core' ;;
+    butter-security-web) assert_present "$graph" butter-security
+                         assert_present "$graph" butter-web
+                         assert_absent "$graph" 'butter-(boot|actuator|data|workflow)|sqlx|runledger-core' ;;
     butter-actuator) assert_absent "$graph" 'butter-(security|web|boot|data|workflow)|axum|sqlx' ;;
     butter-web) assert_absent "$graph" 'butter-(security|actuator|boot|data|workflow)|sqlx' ;;
   esac
 done
 # Ambiguous native SQLx identities make this command fail.
 cargo tree --workspace --all-features --locked --invert sqlx --depth 1
-printf 'PASS: empty defaults, nine facade combinations and component/source isolation\n'
+printf 'PASS: empty defaults, eleven facade combinations and component/source isolation\n'

@@ -44,6 +44,8 @@ pub struct Application {
     address: SocketAddr,
     request_budget: ResponseConstructionBudget,
     initializers: Vec<ApplicationInitializer>,
+    #[cfg(feature = "security-web")]
+    security: Option<butter_security_web::SecurityWeb>,
     #[cfg(feature = "actuator")]
     actuator: Option<butter_actuator::Actuator>,
 }
@@ -59,6 +61,8 @@ impl Application {
             request_budget: ResponseConstructionBudget::new(Duration::from_secs(30))
                 .expect("constant response-construction budget is valid"),
             initializers: Vec::new(),
+            #[cfg(feature = "security-web")]
+            security: None,
             #[cfg(feature = "actuator")]
             actuator: None,
         }
@@ -85,6 +89,25 @@ impl Application {
     pub fn request_budget(mut self, budget: ResponseConstructionBudget) -> Self {
         self.request_budget = budget;
         self
+    }
+
+    /// Explicitly attach validated web security to all application routes.
+    ///
+    /// Attachment is inert until startup. Butter applies the security layer
+    /// after route construction and immediately before HTTP assembly, so routes
+    /// cannot accidentally be appended outside the canonical security boundary.
+    /// Separately attached Actuator reads remain outside application security.
+    /// Repeated attachment is rejected without replacing the first plan.
+    #[cfg(feature = "security-web")]
+    pub fn security(
+        mut self,
+        security: butter_security_web::SecurityWeb,
+    ) -> Result<Self, BoxError> {
+        if self.security.is_some() {
+            return Err(std::io::Error::other("web security already attached").into());
+        }
+        self.security = Some(security);
+        Ok(self)
     }
 
     /// Add protected application initialization before HTTP assembly and binding.
@@ -149,6 +172,8 @@ impl Application {
             address,
             request_budget,
             initializers,
+            #[cfg(feature = "security-web")]
+            security,
             #[cfg(feature = "actuator")]
             actuator,
         } = self;
@@ -172,6 +197,11 @@ impl Application {
                     initialize(scope).await?;
                 }
                 scope.stage("http.assemble")?;
+                #[cfg(feature = "security-web")]
+                let routes = match security {
+                    Some(security) => security.protect(routes),
+                    None => routes,
+                };
                 let policy = RequestPolicy::new(admission, request_budget);
                 #[cfg(feature = "actuator")]
                 let public = actuator
