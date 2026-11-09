@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/butter",
     "crates/butter-core",
+    "crates/butter-security",
     "crates/butter-actuator",
     "crates/butter-boot",
     "crates/butter-web",
@@ -21,6 +22,7 @@ publish = false
 
 [workspace.dependencies]
 butter-core = { path = "crates/butter-core" }
+butter-security = { path = "crates/butter-security" }
 butter-actuator = { path = "crates/butter-actuator" }
 butter-web = { path = "crates/butter-web" }
 butter-boot = { path = "crates/butter-boot" }
@@ -38,6 +40,7 @@ batter-sqlx = { git = "https://github.com/bpcakes/batter", rev = "45b451b3b9b628
 runledger-core = { git = "https://github.com/bpcakes/batter", rev = "45b451b3b9b628be1010095c92859b7d42b9e157" }
 runledger-test-support = { git = "https://github.com/bpcakes/batter", rev = "45b451b3b9b628be1010095c92859b7d42b9e157" }
 cron = "=0.17.0"
+zeroize = "=1.9.1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

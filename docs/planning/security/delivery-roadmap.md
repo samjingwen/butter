@@ -16,6 +16,8 @@ Acceptance requires a coherent request flow, explicit ownership boundaries and r
 
 ## Phase 1: security core
 
+Status: implemented by the first `butter-security` source slice, subject to its exact-head delivery gates and review.
+
 - Add `butter-security`.
 - Add credential request wrappers and credential-free authenticated results.
 - Add principals, authorities and request-scoped security context.

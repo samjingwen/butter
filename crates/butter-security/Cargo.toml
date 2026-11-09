@@ -1,0 +1,18 @@
+[package]
+name = "butter-security"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Transport-independent application security contracts for Butter"
+
+[dependencies]
+zeroize.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "sync", "time", "test-util"] }
+
+[lints]
+workspace = true

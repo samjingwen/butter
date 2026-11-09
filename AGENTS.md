@@ -10,6 +10,7 @@ Reuse mechanisms, keep application policy explicit, and enforce important orderi
 
 - `crates/butter`: feature-selected public facade and runnable example.
 - `crates/butter-core`: upstream lifecycle, settings and operation primitives.
+- `crates/butter-security`: transport-independent authentication and authorization contracts.
 - `crates/butter-actuator`: transport-independent health aggregation and supervised contributor plans.
 - `crates/butter-web`: protected HTTP composition and native Axum interoperability.
 - `crates/butter-boot`: consuming application bootstrap through checked shutdown.
@@ -19,7 +20,7 @@ Reuse mechanisms, keep application policy explicit, and enforce important orderi
 
 ## Invariants
 
-Keep core independent of Actuator, web, data and workflow, and web independent of Actuator.
+Keep core independent of security, Actuator, web, data and workflow, and web independent of security and Actuator.
 Do not implement another async runtime, database engine, queue or identity provider.
 An upstream dependency and a maintained source import are different ownership choices, not interchangeable branding.
 Retain upstream licenses, provenance and failure tests when adopting source.

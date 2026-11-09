@@ -40,19 +40,22 @@ There is no runtime class scanning, DI container or hidden database initializati
 | --- | --- |
 | `butter` | Feature-selected application facade; defaults select core only. |
 | `butter-core` | Lifecycle, configuration, deadlines, cancellation and cleanup primitives. |
+| `butter-security` | Transport-independent authentication and fail-closed authorization contracts. |
 | `butter-actuator` | Transport-independent health with explicitly selected supervised contributors. |
 | `butter-boot` | Inert application assembly, startup, readiness and checked shutdown. |
 | `butter-web` | Protected HTTP routing with native Axum handlers. |
 | `butter-data` | PostgreSQL session/transaction capabilities and native SQLx queries. |
 | `butter-workflow` | Maintained durable persistence with atomic domain/job completion. |
 
-Enable `web`, `actuator`, `data` or `workflow` explicitly on the facade when needed; `workflow` implies `data`.
+Enable `security`, `web`, `actuator`, `data` or `workflow` explicitly on the facade when needed; `workflow` implies `data`.
+`security` alone selects no HTTP stack, persistence driver, identity store or route policy.
 `actuator` alone selects no HTTP stack, and HTTP-only applications do not inherit SQLx or workflow persistence.
 Even with `web,actuator` compiled, routes require explicit `Application::actuator(...)` attachment.
 The removed framework `/live` and `/ready` paths have no aliases; consumers must migrate their health-check paths with their Butter revision.
 See [Actuator usage and compatibility](docs/actuator.md) and the [accepted design](docs/planning/actuator/README.md).
-`butter-security`, `butter-storage`, `butter-observability` and `butter-test` remain intended component names, not implemented packages.
-The proposed Butter Security architecture is documented in the [security planning index](docs/planning/security/README.md).
+The first `butter-security` core slice is implemented; web security, stateful browser security and dedicated test support remain planned.
+Its architecture and delivery boundaries are documented in the [security planning index](docs/planning/security/README.md).
+`butter-storage`, `butter-observability` and `butter-test` remain intended component names, not implemented packages.
 Worker-runtime integration is also pending; the workflow package currently implements persistence and atomic composition, not automatic worker startup.
 
 ## Dependencies and source ownership
@@ -64,7 +67,7 @@ Axum, Tokio, SQLx, the operational foundation and durable model/test-support lib
 The related upstream foundation/model packages resolve from one immutable revision, never a mutable sibling checkout or a moving fork branch.
 
 The extension checks current lease authority, invokes required domain SQL and applies native completion in one protected transaction.
-Application generation, authorization, cancellation and accounting policy remain application-owned.
+Application generation, authorization policy, cancellation and accounting policy remain application-owned.
 An unconfirmed commit is uncertainty, not rollback proof or permission to repeat a provider action.
 See [source provenance](provenance/PROVENANCE.md), [architecture](docs/architecture.md) and [verification](docs/verification.md).
 

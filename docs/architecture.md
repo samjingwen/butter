@@ -9,7 +9,8 @@ Introduce abstractions for actual responsibilities and invariants, not to give e
 ## Dependency direction
 
 The application consumes the `butter` facade or a specific component.
-`butter-boot` composes core and web, while core never depends on Actuator, web, data or workflow.
+`butter-boot` composes core and web, while core never depends on security, Actuator, web, data or workflow.
+`butter-security` is transport-independent and owns credential-safe provider orchestration, immutable contexts and fail-closed authorization contracts without depending on core, web or persistence.
 `butter-actuator` depends only on core and owns health operations, aggregation and contributor plans.
 Boot's optional `actuator` feature provides HTTP mapping; `butter-web` remains independent of Actuator.
 The facade has empty defaults and forwards `actuator` to Boot only when `web` has already selected Boot.
@@ -68,5 +69,5 @@ Upstream copyright, schema identities and source provenance remain explicit even
 ## Non-goals of the bootstrap
 
 There is no DI container, procedural-macro DSL, global subscriber, generic repository, new queue engine or automatic infrastructure provisioner.
-Authentication, object storage, telemetry assembly and worker-runtime bootstrapping require their own real consumer contracts before implementation.
+HTTP security integration, identity storage, object storage, telemetry assembly and worker-runtime bootstrapping require their own real consumer contracts before implementation.
 The bootstrap does not change any application's current database, identity provider, deployment or worker authority boundary.

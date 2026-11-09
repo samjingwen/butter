@@ -5,7 +5,7 @@
 Butter should expose narrow contracts for real responsibilities rather than one universal plugin interface.
 Framework-owned ordering protects invariants while application-owned implementations supply identity and business policy.
 
-The first implementation should prototype both generic and object-safe boundaries before stabilizing public traits.
+The core implementation uses generic protected contexts and object-safe runtime provider collections.
 Object erasure is justified only where heterogeneous runtime composition requires it.
 Static typing remains preferred inside a concrete provider or policy.
 
