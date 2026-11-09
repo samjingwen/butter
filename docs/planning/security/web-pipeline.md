@@ -57,8 +57,9 @@ The initial stage anchors are:
 The builder rejects duplicate extension identifiers, impossible dependencies and placement that moves authorization before authentication.
 Mandatory request cleanup and exception translation cannot be replaced by application extensions.
 
-The Phase 2 spine exposes these names as a fixed framework-owned order.
-The exploit-protection, session-transition and persistence anchors are reserved for later reviewed slices and perform no invented policy in Phase 2.
+The security spine exposes these names as a fixed framework-owned order.
+Phase 3 activates exploit protection, session transition and persistence only for explicitly stateful chains.
+Stateless chains retain the same order without hidden repository or cookie work.
 General before-and-after extension insertion remains deferred; current extensions enter through dedicated matcher, extractor, manager and failure-handler contracts.
 
 ## Exception translation

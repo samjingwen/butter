@@ -4,8 +4,9 @@
 
 Phase 1 implements the transport-independent `butter-security` core.
 Phase 2 implements the `butter-security-web` request-security spine and its explicit `butter-boot` attachment.
-Together they provide credential-safe authentication contracts, immutable request-scoped contexts, ordered providers, first-match web chains, fail-closed authorization and neutral HTTP failures.
-Context persistence, sessions, CSRF and dedicated test support remain planned later slices.
+Phase 3 implements explicit stateful browser chains, session rotation and persistence ordering, host-only cookie transport, CSRF token repositories and handlers, and exact origin validation.
+Together they provide credential-safe authentication contracts, immutable request-scoped contexts, ordered providers, first-match web chains, fail-closed authorization, neutral HTTP failures and stateful browser protection.
+Dedicated reusable test support remains a planned later slice.
 Enabling a security feature alone does not protect an HTTP route.
 An application must build the policy and explicitly attach it through `Application::security`.
 
@@ -51,10 +52,8 @@ The framework owns ordering and generic security mechanisms while consuming appl
 
 The references were reviewed against Spring Security 7.1.2 on 2026-11-08.
 
-## Review questions
+## Remaining review questions
 
-- Whether the first implementation should use generics, object-safe erased traits or a deliberately small combination at each extension boundary.
-- Whether session and CSRF support belongs in the first source milestone or immediately after the request-security spine.
 - Which security headers can be safe framework defaults and which must remain application policy.
 - Which optional adapters demonstrate enough repeated demand to justify additional packages.
 
