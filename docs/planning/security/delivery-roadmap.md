@@ -42,6 +42,8 @@ Acceptance requires real loopback tests for multiple chains, malformed credentia
 
 ## Phase 3: stateful browser security
 
+Status: implemented by the `butter-security-web` stateful browser slice, subject to its exact-head delivery gates and review.
+
 - Add context repository and session strategy integration.
 - Add secure cookie policy.
 - Add session identifier rotation.

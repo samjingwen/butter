@@ -9,7 +9,7 @@ The core implementation uses generic protected contexts and object-safe runtime 
 Object erasure is justified only where heterogeneous runtime composition requires it.
 Static typing remains preferred inside a concrete provider or policy.
 
-## Planned contracts
+## Implemented contracts
 
 | Contract | Responsibility |
 | --- | --- |
@@ -24,9 +24,11 @@ Static typing remains preferred inside a concrete provider or policy.
 | `AuthenticationEntryPoint` | Request credentials or return an unauthenticated response. |
 | `AccessDeniedHandler` | Return the authenticated-but-denied response. |
 | `CsrfTokenRepository` | Create, load, rotate and invalidate CSRF tokens. |
+| `CsrfTokenRequestHandler` | Resolve submitted tokens and control browser token exposure. |
+| `ExploitProtectionDeniedHandler` | Return a neutral origin- or CSRF-denied response. |
 | `SecurityEventSink` | Receive bounded, credential-free security events. |
 
-Names may change after prototype review, but responsibilities should remain separate.
+The contracts remain experimental until a reviewed downstream consumer exercises them from an immutable revision.
 
 ## Pipeline extensions
 

@@ -98,6 +98,14 @@ Concurrent requests prove that different principals remain isolated in request e
 An outer response deadline drops an active authentication future without invoking the application handler.
 The same acceptance proves that application security stays inside Butter admission while explicitly attached Actuator reads remain outside application chains and graceful shutdown still releases the listener.
 
+## Phase 3 verification evidence
+
+Synthetic loopback acceptance covers route-driven login, authenticated context loading, CSRF-protected mutation, explicit token re-exposure, session and token refresh, logout, stale-identifier replay and simultaneous cookie/bearer rejection.
+It proves that refresh makes the previous identifier and token unusable and that logout invalidates server state before browser-cookie expiration is emitted.
+An unconfirmed save and a post-persistence cookie-construction conflict both return a neutral failure without exposing the new identifier; retained test state demonstrates why neither response proves rollback or client receipt.
+An outer response deadline drops active context loading without invoking the application handler.
+Cookie parsing and serialization reuse the pinned upstream browser transport, while Butter owns the corresponding CSRF and persistence sequencing.
+
 ## Review cadence
 
 The threat model is reviewed before each new authentication mechanism, persistence adapter or pipeline extension.

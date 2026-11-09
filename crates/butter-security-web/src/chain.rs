@@ -1,8 +1,13 @@
 use crate::{
     AccessDeniedHandler, AuthenticationEntryPoint, CredentialExtraction,
-    CredentialExtractionFailure, CredentialExtractor, CredentialSource, MatcherDescriptor,
-    NeutralAccessDeniedHandler, NeutralAuthenticationEntryPoint, RequestMatcher, RequestMetadata,
-    WebAuthenticationFailure, matcher::descriptor_covers, response::empty_response,
+    CredentialExtractionFailure, CredentialExtractor, CredentialSource, CsrfProtection,
+    CsrfTokenLoad, ExploitProtectionFailure, MatcherDescriptor, NeutralAccessDeniedHandler,
+    NeutralAuthenticationEntryPoint, RequestMatcher, RequestMetadata, SecurityContextLoad,
+    SessionIdentifier, SessionTransition, StatefulSecurity, WebAuthenticationFailure,
+    csrf::tokens_equal,
+    matcher::descriptor_covers,
+    response::empty_response,
+    session::{CsrfDecision, SessionTransitionKind},
 };
 use butter_security::{
     AuthenticationManager, AuthorizationFailure, AuthorizationManager, SecurityContext, authorize,
@@ -11,7 +16,7 @@ use butter_web::{
     Router,
     native::{
         extract::{Request, State},
-        http::StatusCode,
+        http::{HeaderMap, StatusCode},
         middleware::{self, Next},
         response::Response,
     },
@@ -162,6 +167,7 @@ pub struct SecurityChain {
     authorization_manager: Arc<dyn AuthorizationManager<RequestMetadata>>,
     entry_point: Arc<dyn AuthenticationEntryPoint>,
     denied_handler: Arc<dyn AccessDeniedHandler>,
+    stateful: Option<Arc<StatefulSecurity>>,
 }
 
 impl SecurityChain {
@@ -181,6 +187,7 @@ impl SecurityChain {
             authorization_manager: None,
             entry_point: None,
             denied_handler: None,
+            stateful: None,
         }
     }
 
@@ -206,6 +213,12 @@ impl SecurityChain {
     pub fn stages(&self) -> impl ExactSizeIterator<Item = PipelineStage> {
         PIPELINE_STAGES.into_iter()
     }
+
+    /// Returns stateful browser security when this is not a stateless chain.
+    #[must_use]
+    pub fn stateful_security(&self) -> Option<&StatefulSecurity> {
+        self.stateful.as_deref()
+    }
 }
 
 /// Explicit builder for one security chain.
@@ -218,6 +231,7 @@ pub struct SecurityChainBuilder {
     authorization_manager: Option<Arc<dyn AuthorizationManager<RequestMetadata>>>,
     entry_point: Option<Arc<dyn AuthenticationEntryPoint>>,
     denied_handler: Option<Arc<dyn AccessDeniedHandler>>,
+    stateful: Option<Arc<StatefulSecurity>>,
 }
 
 impl SecurityChainBuilder {
@@ -274,6 +288,12 @@ impl SecurityChainBuilder {
         self
     }
 
+    /// Enables explicit stateful browser security for this chain.
+    pub fn stateful_security(&mut self, stateful: StatefulSecurity) -> &mut Self {
+        self.stateful = Some(Arc::new(stateful));
+        self
+    }
+
     /// Validates and completes the chain.
     pub fn build(self) -> Result<SecurityChain, SecurityBuildError> {
         match (
@@ -301,6 +321,7 @@ impl SecurityChainBuilder {
             denied_handler: self
                 .denied_handler
                 .ok_or(SecurityBuildError::MissingAccessDeniedHandler)?,
+            stateful: self.stateful,
         })
     }
 }
@@ -438,49 +459,142 @@ async fn security_middleware(
                 request
                     .extensions_mut()
                     .insert(SecurityContext::anonymous());
-                next.run(request).await
+                let mut response = next.run(request).await;
+                if response
+                    .extensions_mut()
+                    .remove::<SessionTransition>()
+                    .is_some()
+                {
+                    operational_failure_response()
+                } else {
+                    response
+                }
             }
         };
     };
 
+    let loaded = match load_context(chain, &metadata, request.headers()).await {
+        Ok(loaded) => loaded,
+        Err(ContextLoadStepFailure::MalformedCookie) => {
+            return empty_response(StatusCode::BAD_REQUEST);
+        }
+        Err(ContextLoadStepFailure::Operational) => return operational_failure_response(),
+    };
+    if let Some(stateful) = chain.stateful.as_deref()
+        && let CsrfDecision::Enabled(protection) = &stateful.csrf
+        && let Err(failure) = enforce_exploit_protection(
+            protection,
+            &metadata,
+            request.headers(),
+            loaded.identifier.as_ref(),
+        )
+        .await
+    {
+        let response = match failure {
+            ExploitProtectionStepFailure::Denied(failure) => {
+                protection.denied_handler.denied(&metadata, failure).await
+            }
+            ExploitProtectionStepFailure::Operational => operational_failure_response(),
+        };
+        return finish_invalid_session(stateful, loaded.invalid, response);
+    }
+
     let source = CredentialSource::new(request.method(), request.uri(), request.headers());
-    let context = match authenticate(chain, source).await {
-        Ok(context) => context,
+    let authentication = match authenticate(
+        chain,
+        source,
+        loaded.context.clone(),
+        loaded.identifier.is_some(),
+    )
+    .await
+    {
+        Ok(authentication) => authentication,
         Err(AuthenticationStepFailure::Extraction(failure)) => {
-            return chain
+            let response = chain
                 .entry_point
                 .commence(&metadata, WebAuthenticationFailure::Extraction(failure))
                 .await;
+            return finish_invalid_session_option(chain, loaded.invalid, response);
         }
         Err(AuthenticationStepFailure::Authentication(failure)) => {
-            return chain
+            let response = chain
                 .entry_point
                 .commence(&metadata, WebAuthenticationFailure::Authentication(failure))
                 .await;
+            return finish_invalid_session_option(chain, loaded.invalid, response);
         }
     };
-    match authorize(chain.authorization_manager.as_ref(), &context, &metadata).await {
+
+    let prepared_identifier = if authentication.fresh {
+        if let Some(stateful) = chain.stateful.as_deref() {
+            match stateful
+                .strategy
+                .rotate(&metadata, None, &authentication.context)
+                .await
+            {
+                Ok(identifier) => Some(identifier),
+                Err(_) => return operational_failure_response(),
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    match authorize(
+        chain.authorization_manager.as_ref(),
+        &authentication.context,
+        &metadata,
+    )
+    .await
+    {
         Ok(()) => {
-            request.extensions_mut().insert(context);
-            next.run(request).await
+            request
+                .extensions_mut()
+                .insert(authentication.context.clone());
+            let mut response = next.run(request).await;
+            let transition = response.extensions_mut().remove::<SessionTransition>();
+            if let Some(stateful) = chain.stateful.as_deref() {
+                complete_stateful_response(
+                    stateful,
+                    &metadata,
+                    loaded,
+                    authentication,
+                    prepared_identifier,
+                    transition,
+                    response,
+                )
+                .await
+            } else if transition.is_some() {
+                operational_failure_response()
+            } else {
+                response
+            }
         }
         Err(failure @ (AuthorizationFailure::Denied | AuthorizationFailure::NoGrant))
-            if !context.is_authenticated() =>
+            if !authentication.context.is_authenticated() =>
         {
             let _ = failure;
-            chain
+            let response = chain
                 .entry_point
                 .commence(&metadata, WebAuthenticationFailure::MissingCredentials)
-                .await
+                .await;
+            finish_invalid_session_option(chain, loaded.invalid, response)
         }
-        Err(failure) => chain.denied_handler.denied(&metadata, failure).await,
+        Err(failure) => {
+            let response = chain.denied_handler.denied(&metadata, failure).await;
+            finish_invalid_session_option(chain, loaded.invalid, response)
+        }
     }
 }
 
 async fn authenticate(
     chain: &SecurityChain,
     source: CredentialSource<'_>,
-) -> Result<SecurityContext, AuthenticationStepFailure> {
+    loaded_context: SecurityContext,
+    browser_credential_present: bool,
+) -> Result<AuthenticationStep, AuthenticationStepFailure> {
     let mut extracted = None;
     for registered in &chain.extractors {
         match registered.extractor.extract(source) {
@@ -499,8 +613,16 @@ async fn authenticate(
         }
     }
     let Some(authentication_request) = extracted else {
-        return Ok(SecurityContext::anonymous());
+        return Ok(AuthenticationStep {
+            context: loaded_context,
+            fresh: false,
+        });
     };
+    if browser_credential_present {
+        return Err(AuthenticationStepFailure::Extraction(
+            CredentialExtractionFailure::Ambiguous,
+        ));
+    }
     let Some(manager) = chain.authentication_manager.as_ref() else {
         return Err(AuthenticationStepFailure::Authentication(
             butter_security::AuthenticationFailure::Operational(
@@ -509,9 +631,337 @@ async fn authenticate(
         ));
     };
     match manager.authenticate(authentication_request.as_ref()).await {
-        Ok(authentication) => Ok(authentication.into_context()),
+        Ok(authentication) => Ok(AuthenticationStep {
+            context: authentication.into_context(),
+            fresh: true,
+        }),
         Err(failure) => Err(AuthenticationStepFailure::Authentication(failure)),
     }
+}
+
+struct AuthenticationStep {
+    context: SecurityContext,
+    fresh: bool,
+}
+
+struct LoadedSession {
+    identifier: Option<SessionIdentifier>,
+    context: SecurityContext,
+    invalid: bool,
+}
+
+async fn load_context(
+    chain: &SecurityChain,
+    metadata: &RequestMetadata,
+    headers: &HeaderMap,
+) -> Result<LoadedSession, ContextLoadStepFailure> {
+    let Some(stateful) = chain.stateful.as_deref() else {
+        return Ok(LoadedSession {
+            identifier: None,
+            context: SecurityContext::anonymous(),
+            invalid: false,
+        });
+    };
+    let identifier = stateful
+        .cookie
+        .read(headers)
+        .map_err(|_| ContextLoadStepFailure::MalformedCookie)?;
+    let Some(identifier) = identifier else {
+        return Ok(LoadedSession {
+            identifier: None,
+            context: SecurityContext::anonymous(),
+            invalid: false,
+        });
+    };
+    let (context, invalid) = match stateful.repository.load(metadata, &identifier).await {
+        Ok(SecurityContextLoad::Active(context)) if context.is_authenticated() => (context, false),
+        Ok(SecurityContextLoad::Missing | SecurityContextLoad::Invalid) => {
+            (SecurityContext::anonymous(), true)
+        }
+        Ok(SecurityContextLoad::Active(_)) | Err(_) => {
+            return Err(ContextLoadStepFailure::Operational);
+        }
+    };
+    Ok(LoadedSession {
+        identifier: Some(identifier),
+        context,
+        invalid,
+    })
+}
+
+async fn enforce_exploit_protection(
+    protection: &CsrfProtection,
+    metadata: &RequestMetadata,
+    headers: &HeaderMap,
+    identifier: Option<&SessionIdentifier>,
+) -> Result<(), ExploitProtectionStepFailure> {
+    if !protection.unsafe_matcher.matches(metadata) {
+        return Ok(());
+    }
+    protection.origin_policy.check(headers).map_err(|failure| {
+        ExploitProtectionStepFailure::Denied(ExploitProtectionFailure::Origin(failure))
+    })?;
+    let Some(identifier) = identifier else {
+        return Ok(());
+    };
+    let presented = protection
+        .request_handler
+        .resolve(headers)
+        .map_err(|_| ExploitProtectionStepFailure::Denied(ExploitProtectionFailure::Csrf))?;
+    let expected = protection
+        .repository
+        .load(metadata, identifier)
+        .await
+        .map_err(|_| ExploitProtectionStepFailure::Operational)?;
+    match (expected, presented) {
+        (CsrfTokenLoad::Found(expected), Some(presented))
+            if tokens_equal(&expected, &presented) =>
+        {
+            Ok(())
+        }
+        _ => Err(ExploitProtectionStepFailure::Denied(
+            ExploitProtectionFailure::Csrf,
+        )),
+    }
+}
+
+async fn complete_stateful_response(
+    stateful: &StatefulSecurity,
+    metadata: &RequestMetadata,
+    loaded: LoadedSession,
+    authentication: AuthenticationStep,
+    prepared_identifier: Option<SessionIdentifier>,
+    transition: Option<SessionTransition>,
+    response: Response,
+) -> Response {
+    if authentication.fresh && transition.is_some() {
+        return operational_failure_response();
+    }
+    if transition.is_some()
+        && !(response.status().is_success() || response.status().is_redirection())
+    {
+        return operational_failure_response();
+    }
+    if !(response.status().is_success() || response.status().is_redirection()) {
+        return finish_invalid_session(stateful, loaded.invalid, response);
+    }
+
+    let transition = transition.map(|transition| transition.kind).or_else(|| {
+        authentication
+            .fresh
+            .then_some(SessionTransitionKind::Establish(
+                authentication.context.clone(),
+            ))
+    });
+    match transition {
+        Some(SessionTransitionKind::Establish(context)) => {
+            establish_session(
+                stateful,
+                metadata,
+                loaded.identifier.as_ref(),
+                &context,
+                prepared_identifier,
+                response,
+            )
+            .await
+        }
+        Some(SessionTransitionKind::Refresh) => {
+            if loaded.invalid
+                || loaded.identifier.is_none()
+                || !authentication.context.is_authenticated()
+            {
+                return operational_failure_response();
+            }
+            establish_session(
+                stateful,
+                metadata,
+                loaded.identifier.as_ref(),
+                &authentication.context,
+                None,
+                response,
+            )
+            .await
+        }
+        Some(SessionTransitionKind::ExposeCsrf) => {
+            let Some(identifier) = loaded.identifier.as_ref() else {
+                return operational_failure_response();
+            };
+            if loaded.invalid || !authentication.context.is_authenticated() {
+                return operational_failure_response();
+            }
+            expose_csrf_token(stateful, metadata, identifier, response).await
+        }
+        Some(SessionTransitionKind::Logout) => {
+            logout_session(stateful, metadata, loaded.identifier.as_ref(), response).await
+        }
+        None => finish_invalid_session(stateful, loaded.invalid, response),
+    }
+}
+
+async fn expose_csrf_token(
+    stateful: &StatefulSecurity,
+    metadata: &RequestMetadata,
+    identifier: &SessionIdentifier,
+    mut response: Response,
+) -> Response {
+    let CsrfDecision::Enabled(protection) = &stateful.csrf else {
+        return operational_failure_response();
+    };
+    let token = match protection.repository.load(metadata, identifier).await {
+        Ok(CsrfTokenLoad::Found(token)) => token,
+        Ok(CsrfTokenLoad::Missing) | Err(_) => return operational_failure_response(),
+    };
+    if protection
+        .request_handler
+        .expose(response.headers_mut(), &token)
+        .is_err()
+    {
+        return operational_failure_response();
+    }
+    response
+}
+
+async fn establish_session(
+    stateful: &StatefulSecurity,
+    metadata: &RequestMetadata,
+    previous: Option<&SessionIdentifier>,
+    context: &SecurityContext,
+    prepared_identifier: Option<SessionIdentifier>,
+    mut response: Response,
+) -> Response {
+    if !context.is_authenticated() {
+        return operational_failure_response();
+    }
+    let identifier = match prepared_identifier {
+        Some(identifier) => identifier,
+        None => match stateful.strategy.rotate(metadata, previous, context).await {
+            Ok(identifier) => identifier,
+            Err(_) => return operational_failure_response(),
+        },
+    };
+    if previous.is_some_and(|previous| {
+        crate::session::secret_values_equal(previous.expose_secret(), identifier.expose_secret())
+    }) {
+        return operational_failure_response();
+    }
+    if stateful
+        .repository
+        .save(metadata, previous, &identifier, context)
+        .await
+        .is_err()
+    {
+        return operational_failure_response();
+    }
+    let csrf_token = match &stateful.csrf {
+        CsrfDecision::Enabled(protection) => {
+            let token = match previous {
+                Some(previous) => {
+                    protection
+                        .repository
+                        .rotate(metadata, previous, &identifier)
+                        .await
+                }
+                None => protection.repository.create(metadata, &identifier).await,
+            };
+            match token {
+                Ok(token) => Some((protection, token)),
+                Err(_) => return operational_failure_response(),
+            }
+        }
+        CsrfDecision::Disabled => None,
+    };
+    if stateful
+        .cookie
+        .append(response.headers_mut(), &identifier)
+        .is_err()
+    {
+        return operational_failure_response();
+    }
+    if let Some((protection, token)) = csrf_token
+        && protection
+            .request_handler
+            .expose(response.headers_mut(), &token)
+            .is_err()
+    {
+        return operational_failure_response();
+    }
+    response
+}
+
+async fn logout_session(
+    stateful: &StatefulSecurity,
+    metadata: &RequestMetadata,
+    identifier: Option<&SessionIdentifier>,
+    mut response: Response,
+) -> Response {
+    if let Some(identifier) = identifier {
+        if stateful
+            .repository
+            .invalidate(metadata, identifier)
+            .await
+            .is_err()
+        {
+            return operational_failure_response();
+        }
+        if let CsrfDecision::Enabled(protection) = &stateful.csrf
+            && protection
+                .repository
+                .invalidate(metadata, identifier)
+                .await
+                .is_err()
+        {
+            return operational_failure_response();
+        }
+    }
+    if remove_browser_cookies(stateful, response.headers_mut()).is_err() {
+        return operational_failure_response();
+    }
+    response
+}
+
+fn finish_invalid_session(
+    stateful: &StatefulSecurity,
+    invalid: bool,
+    mut response: Response,
+) -> Response {
+    if invalid && remove_browser_cookies(stateful, response.headers_mut()).is_err() {
+        operational_failure_response()
+    } else {
+        response
+    }
+}
+
+fn finish_invalid_session_option(
+    chain: &SecurityChain,
+    invalid: bool,
+    response: Response,
+) -> Response {
+    match chain.stateful.as_deref() {
+        Some(stateful) => finish_invalid_session(stateful, invalid, response),
+        None => response,
+    }
+}
+
+fn remove_browser_cookies(stateful: &StatefulSecurity, headers: &mut HeaderMap) -> Result<(), ()> {
+    stateful.cookie.append_removal(headers).map_err(|_| ())?;
+    if let CsrfDecision::Enabled(protection) = &stateful.csrf {
+        protection.request_handler.remove(headers).map_err(|_| ())?;
+    }
+    Ok(())
+}
+
+fn operational_failure_response() -> Response {
+    empty_response(StatusCode::SERVICE_UNAVAILABLE)
+}
+
+enum ContextLoadStepFailure {
+    MalformedCookie,
+    Operational,
+}
+
+enum ExploitProtectionStepFailure {
+    Denied(ExploitProtectionFailure),
+    Operational,
 }
 
 enum AuthenticationStepFailure {

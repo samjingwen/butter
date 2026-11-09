@@ -20,8 +20,8 @@ It does not depend on Axum, Tower, SQLx, cookies, JWT libraries or a persistence
 ### `butter-security-web`
 
 The implemented web package integrates core security contracts with `butter-web`, Axum and Tower.
-It owns request matchers, security-chain selection, credential extraction, request-scoped context, exception translation and framework-owned stage anchors.
-The initial spine reserves exploit-protection, session-transition and context-persistence anchors without pretending to implement those later policies.
+It owns request matchers, security-chain selection, credential extraction, request-scoped context, exception translation, stateful browser orchestration and framework-owned stage anchors.
+Phase 3 activates context loading, exploit protection, session transition and context persistence only for chains that explicitly install a complete `StatefulSecurity` plan.
 Its explicit Boot attachment preserves Butter's existing HTTP admission, response-construction deadline, Actuator reads and graceful-shutdown contracts.
 
 ### `butter-security-test`
@@ -83,8 +83,8 @@ Request-owned sensitive material is dropped on every completion path, including 
 ## Build-time validation
 
 Security configuration is inert until built and performs no I/O during construction.
-The Phase 2 build step validates unique priorities and identifiers, provable broad-before-narrow shadowing, explicit unmatched behavior, extractor and manager consistency, stage-component uniqueness and handler completeness before a listener is bound.
-CSRF completeness belongs to the later stateful browser-security build step.
+The build steps validate unique priorities and identifiers, provable broad-before-narrow shadowing, explicit unmatched behavior, extractor and manager consistency, stage-component uniqueness and handler completeness before a listener is bound.
+Stateful construction additionally requires a context repository, session strategy, `HttpOnly` session cookie and explicit CSRF decision, and rejects session/CSRF cookie-name collisions.
 Invalid security composition is a startup error rather than a runtime warning.
 
 The built plan exposes safe chain identifiers, priorities, matcher descriptions and stage names without including credentials or application secrets.
