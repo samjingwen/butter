@@ -11,6 +11,7 @@ description = "Smooth startup and reusable capabilities for Rust applications"
 [features]
 default = []
 security = ["dep:butter-security"]
+security-web = ["security", "web", "dep:butter-security-web", "butter-boot/security-web"]
 web = ["dep:butter-web", "dep:butter-boot"]
 data = ["dep:butter-data"]
 workflow = ["dep:butter-workflow", "data"]
@@ -19,6 +20,7 @@ actuator = ["dep:butter-actuator", "butter-boot?/actuator"]
 [dependencies]
 butter-core.workspace = true
 butter-security = { workspace = true, optional = true }
+butter-security-web = { workspace = true, optional = true }
 butter-actuator = { workspace = true, optional = true }
 butter-web = { workspace = true, optional = true }
 butter-boot = { workspace = true, optional = true }

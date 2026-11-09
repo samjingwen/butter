@@ -1,0 +1,17 @@
+[package]
+name = "butter-security-web"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Validated HTTP security composition for Butter"
+
+[dependencies]
+butter-security.workspace = true
+butter-web.workspace = true
+zeroize.workspace = true
+
+[lints]
+workspace = true

@@ -11,14 +11,17 @@ description = "Application bootstrap and checked shutdown for Butter"
 [features]
 default = []
 actuator = ["dep:butter-actuator"]
+security-web = ["dep:butter-security-web"]
 
 [dependencies]
 butter-core.workspace = true
 butter-actuator = { workspace = true, optional = true }
+butter-security-web = { workspace = true, optional = true }
 butter-web.workspace = true
 tokio = { workspace = true, features = ["net"] }
 
 [dev-dependencies]
+butter-security.workspace = true
 tracing.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util", "time"] }
 

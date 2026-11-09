@@ -336,6 +336,7 @@ dependencies = [
  "butter-core",
  "butter-data",
  "butter-security",
+ "butter-security-web",
  "butter-web",
  "butter-workflow",
  "tokio",
@@ -355,6 +356,8 @@ version = "0.1.0"
 dependencies = [
  "butter-actuator",
  "butter-core",
+ "butter-security",
+ "butter-security-web",
  "butter-web",
  "tokio",
  "tracing",
@@ -380,6 +383,15 @@ name = "butter-security"
 version = "0.1.0"
 dependencies = [
  "tokio",
+ "zeroize",
+]
+
+[[package]]
+name = "butter-security-web"
+version = "0.1.0"
+dependencies = [
+ "butter-security",
+ "butter-web",
  "zeroize",
 ]
 

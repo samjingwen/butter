@@ -29,6 +29,8 @@ Acceptance requires provider fallback, terminal rejection, all-abstain denial, s
 
 ## Phase 2: web security spine
 
+Status: implemented by the `butter-security-web` source slice, subject to its exact-head delivery gates and review.
+
 - Add `butter-security-web`.
 - Add request matchers and first-match chain selection.
 - Add named pipeline stages and build-time validation.

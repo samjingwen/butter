@@ -29,7 +29,7 @@ pub use authorization::{
     AllAuthoritiesRequired, AllOf, AnonymousRequired, AnyAuthorityRequired, AnyOf,
     AuthenticatedRequired, AuthorityRequired, AuthorizationBuildError, AuthorizationDecision,
     AuthorizationFailure, AuthorizationFuture, AuthorizationManager, AuthorizationOperationalError,
-    DenyAll, MinimumAssurance, Not, PermitAll, When, authorize,
+    DenyAll, DenyOverridesAnyOf, MinimumAssurance, Not, PermitAll, When, authorize,
 };
 pub use context::SecurityContext;
 pub use credential::Credential;

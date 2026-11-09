@@ -34,8 +34,9 @@ The framework should provide small managers for:
 - Minimum authentication assurance required.
 - Conditional delegation.
 
-The framework should also provide `all_of`, `any_of` and `not` composition with precisely documented abstain and short-circuit behavior.
-Composition must not hide a denial behind an unrelated grant.
+The framework provides `AllOf`, logical `AnyOf`, `Not` and conditional composition with documented abstain and short-circuit behavior.
+Logical `AnyOf` grants when any manager grants, denies when at least one manager denies and none grants, and abstains only when all managers abstain.
+Policies that require a veto use the separately named `DenyOverridesAnyOf`, where any denial wins even when another manager grants.
 
 ## Request authorization
 

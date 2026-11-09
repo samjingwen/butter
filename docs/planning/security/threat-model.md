@@ -90,6 +90,14 @@ Butter does not replace network denial-of-service protection, operating-system i
 - Keep security context request-scoped.
 - Fail startup on invalid stage ordering.
 
+## Phase 2 verification evidence
+
+Synthetic loopback acceptance covers first-match public, authenticated and authority-specific chains.
+It covers malformed and duplicate authorization fields, conflicting bearer and API-key presentations, neutral rejected-credential responses, unmatched denial and encoded path separation.
+Concurrent requests prove that different principals remain isolated in request extensions.
+An outer response deadline drops an active authentication future without invoking the application handler.
+The same acceptance proves that application security stays inside Butter admission while explicitly attached Actuator reads remain outside application chains and graceful shutdown still releases the listener.
+
 ## Review cadence
 
 The threat model is reviewed before each new authentication mechanism, persistence adapter or pipeline extension.

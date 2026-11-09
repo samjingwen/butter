@@ -329,8 +329,25 @@ async fn all_abstain_denies_by_default() -> TestResult {
 }
 
 #[tokio::test]
-async fn any_of_does_not_hide_denial_behind_grant() -> TestResult {
-    let manager = AnyOf::new(vec![
+async fn any_of_is_logical_or_and_short_circuits_on_grant() -> TestResult {
+    let skipped_calls = Arc::new(AtomicUsize::new(0));
+    let skipped: Arc<dyn AuthorizationManager<()>> = Arc::new(CountingDecision {
+        decision: AuthorizationDecision::Deny,
+        calls: Arc::clone(&skipped_calls),
+    });
+    let manager = AnyOf::new(vec![policy(AuthorizationDecision::Grant), skipped])?;
+
+    assert_eq!(
+        manager.check(&SecurityContext::anonymous(), &()).await?,
+        AuthorizationDecision::Grant
+    );
+    assert_eq!(skipped_calls.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn deny_overrides_any_of_retains_explicit_veto_semantics() -> TestResult {
+    let manager = DenyOverridesAnyOf::new(vec![
         policy(AuthorizationDecision::Grant),
         policy(AuthorizationDecision::Deny),
     ])?;

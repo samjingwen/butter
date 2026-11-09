@@ -432,11 +432,10 @@ impl<C: ?Sized + Sync> AuthorizationManager<C> for AllOf<C> {
     }
 }
 
-/// Deny-overrides disjunction of a non-empty ordered manager list.
+/// Logical disjunction of a non-empty ordered manager list.
 ///
-/// A denial short-circuits and cannot be hidden by an unrelated grant. In the
-/// absence of denial, one or more grants produce `Grant`; all abstain produces
-/// `Abstain`. A grant therefore does not short-circuit later denial.
+/// A grant short-circuits evaluation. In the absence of a grant, one or more
+/// denials produce `Deny`; all abstain produces `Abstain`.
 pub struct AnyOf<C: ?Sized + Sync> {
     managers: Vec<Arc<dyn AuthorizationManager<C>>>,
 }
@@ -453,6 +452,50 @@ impl<C: ?Sized + Sync> AnyOf<C> {
 }
 
 impl<C: ?Sized + Sync> AuthorizationManager<C> for AnyOf<C> {
+    fn check<'a>(
+        &'a self,
+        context: &'a SecurityContext,
+        protected: &'a C,
+    ) -> AuthorizationFuture<'a> {
+        Box::pin(async move {
+            let mut denied = false;
+            for manager in &self.managers {
+                match manager.check(context, protected).await? {
+                    AuthorizationDecision::Grant => return Ok(AuthorizationDecision::Grant),
+                    AuthorizationDecision::Deny => denied = true,
+                    AuthorizationDecision::Abstain => {}
+                }
+            }
+            Ok(if denied {
+                AuthorizationDecision::Deny
+            } else {
+                AuthorizationDecision::Abstain
+            })
+        })
+    }
+}
+
+/// Deny-overrides disjunction of a non-empty ordered manager list.
+///
+/// A denial short-circuits and cannot be hidden by an unrelated grant. In the
+/// absence of denial, one or more grants produce `Grant`; all abstain produces
+/// `Abstain`. A grant therefore does not short-circuit later denial.
+pub struct DenyOverridesAnyOf<C: ?Sized + Sync> {
+    managers: Vec<Arc<dyn AuthorizationManager<C>>>,
+}
+
+impl<C: ?Sized + Sync> DenyOverridesAnyOf<C> {
+    /// Validates and constructs a bounded deny-overrides disjunction.
+    pub fn new(
+        managers: Vec<Arc<dyn AuthorizationManager<C>>>,
+    ) -> Result<Self, AuthorizationBuildError> {
+        Ok(Self {
+            managers: validate_managers(managers)?,
+        })
+    }
+}
+
+impl<C: ?Sized + Sync> AuthorizationManager<C> for DenyOverridesAnyOf<C> {
     fn check<'a>(
         &'a self,
         context: &'a SecurityContext,
