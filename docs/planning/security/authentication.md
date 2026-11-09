@@ -14,8 +14,10 @@ Credential-bearing values must redact themselves from `Debug`, display and error
 They should avoid cloning, use bounded inputs and zeroize memory when the underlying representation supports it.
 They must never enter traces, metrics labels, security events or the resulting security context.
 
-The exact Rust representation needs a prototype because an ordered provider collection must balance static typing, object safety and credential ownership.
-The public contract must not force applications to serialize credentials or convert every mechanism into an untyped string map.
+The core uses an object-safe authentication-request trait with typed `Any` downcasting at a recognizing provider.
+The supplied generic credential request owns zeroizing, redacted credential material and is neither clonable nor displayable.
+Provider and manager traits return boxed borrowing futures so ordered heterogeneous composition does not clone or serialize credentials.
+Applications may define typed requests without converting every mechanism into an untyped string map.
 
 ## Authenticated result
 

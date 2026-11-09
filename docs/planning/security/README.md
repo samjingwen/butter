@@ -2,9 +2,10 @@
 
 ## Status
 
-Butter Security is a proposed framework capability and is not implemented.
-These documents define architecture, boundaries, extension contracts and acceptance gates for review before source scaffolding begins.
-They do not claim that Butter currently authenticates or authorizes requests.
+Phase 1 implements the transport-independent `butter-security` core.
+It provides credential-safe authentication contracts, immutable request-scoped contexts, ordered provider orchestration, fail-closed authorization and credential-free events.
+Web request processing, context persistence, sessions, CSRF and test support remain planned later slices.
+Enabling the core feature alone does not protect an HTTP route.
 
 ## Objective
 

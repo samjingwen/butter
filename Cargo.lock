@@ -335,6 +335,7 @@ dependencies = [
  "butter-boot",
  "butter-core",
  "butter-data",
+ "butter-security",
  "butter-web",
  "butter-workflow",
  "tokio",
@@ -372,6 +373,14 @@ version = "0.1.0"
 dependencies = [
  "batter-sqlx",
  "sqlx",
+]
+
+[[package]]
+name = "butter-security"
+version = "0.1.0"
+dependencies = [
+ "tokio",
+ "zeroize",
 ]
 
 [[package]]

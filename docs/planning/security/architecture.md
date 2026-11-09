@@ -9,17 +9,17 @@ Rust ownership, async execution, typed construction and explicit dependencies de
 Butter Security is application-security infrastructure rather than an identity provider.
 It protects an application's entry points and service boundaries without owning the application's users, tenants, credentials, keys or business permissions.
 
-## Proposed packages
+## Package boundaries
 
 ### `butter-security`
 
-The core package owns protocol-independent security types and traits.
+The implemented core package owns protocol-independent security types and traits.
 It defines authentication requests and results, principals, authorities, security context, authentication managers and providers, authorization managers, decisions, handlers and security events.
 It does not depend on Axum, Tower, SQLx, cookies, JWT libraries or a persistence driver.
 
 ### `butter-security-web`
 
-The web package integrates core security contracts with `butter-web`, Axum and Tower.
+The planned web package integrates core security contracts with `butter-web`, Axum and Tower.
 It owns request matchers, security-chain selection, credential extraction, request-scoped context, exception translation, exploit-protection composition and framework-validated stage ordering.
 It must preserve Butter's existing HTTP admission, response-construction deadline, liveness, readiness and graceful-shutdown contracts.
 
