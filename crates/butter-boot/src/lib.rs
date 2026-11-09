@@ -9,13 +9,17 @@ use butter_core::{
     cleanup::CleanupBudget,
     lifecycle::{LifecycleStatus, RunningSupervisor, ShutdownBudget, ShutdownSuccess, Supervisor},
     operation::OperationOwner,
-    startup::{ApplicationError, Startup},
+    startup::{ApplicationError, ProtectedStartupScope, Startup, StartupFuture},
 };
 use butter_web::{HttpBoundary, RequestPolicy, ResponseConstructionBudget, Router};
 use std::{net::SocketAddr, time::Duration};
 
 #[cfg(feature = "actuator")]
 mod actuator;
+
+type ApplicationInitializer = Box<
+    dyn for<'a> FnOnce(&'a mut ProtectedStartupScope) -> StartupFuture<'a, ApplicationError> + Send,
+>;
 
 /// Inert HTTP application configuration. Construction performs no I/O.
 ///
@@ -39,6 +43,7 @@ pub struct Application {
     routes: Router,
     address: SocketAddr,
     request_budget: ResponseConstructionBudget,
+    initializers: Vec<ApplicationInitializer>,
     #[cfg(feature = "actuator")]
     actuator: Option<butter_actuator::Actuator>,
 }
@@ -53,6 +58,7 @@ impl Application {
             address: SocketAddr::from(([127, 0, 0, 1], 8080)),
             request_budget: ResponseConstructionBudget::new(Duration::from_secs(30))
                 .expect("constant response-construction budget is valid"),
+            initializers: Vec::new(),
             #[cfg(feature = "actuator")]
             actuator: None,
         }
@@ -81,6 +87,42 @@ impl Application {
         self
     }
 
+    /// Add protected application initialization before HTTP assembly and binding.
+    ///
+    /// Initializers run in declaration order and may await native acquisition or
+    /// validation. Reserve cleanup before acquisition with
+    /// [`ProtectedStartupScope::reserve_cleanup`], then register it immediately
+    /// after success. Registered cleanup participates in failed-startup rollback
+    /// and checked shutdown under the application's bounded LIFO cleanup policy.
+    ///
+    /// ```no_run
+    /// use butter_boot::Application;
+    /// use butter_web::Router;
+    /// # async fn example() -> Result<(), butter_core::BoxError> {
+    /// let application = Application::new(Router::new()).initialize(|scope| {
+    ///     Box::pin(async move {
+    ///         let slot = scope.reserve_cleanup("store.pool")?;
+    ///         let resource = String::from("acquired");
+    ///         slot.register(move || async move {
+    ///             drop(resource);
+    ///             Ok(())
+    ///         });
+    ///         Ok(())
+    ///     })
+    /// });
+    /// application.bind("127.0.0.1:0".parse()?).start().await?.shutdown().await?;
+    /// # Ok(()) }
+    /// ```
+    pub fn initialize<F>(mut self, initialize: F) -> Self
+    where
+        F: for<'a> FnOnce(&'a mut ProtectedStartupScope) -> StartupFuture<'a, ApplicationError>
+            + Send
+            + 'static,
+    {
+        self.initializers.push(Box::new(initialize));
+        self
+    }
+
     /// Bind and start, returning only after native component readiness.
     /// Does not install process signal listeners; suitable for embedded applications and tests.
     pub async fn start(self) -> Result<RunningApplication, BoxError> {
@@ -102,6 +144,14 @@ impl Application {
     }
 
     async fn start_inner(self, signals: bool) -> Result<RunningApplication, BoxError> {
+        let Application {
+            routes,
+            address,
+            request_budget,
+            initializers,
+            #[cfg(feature = "actuator")]
+            actuator,
+        } = self;
         let second = Duration::from_secs(1);
         let cleanup = CleanupBudget::new(second * 5, second * 3, second)?;
         let supervisor = Supervisor::new(ShutdownBudget::new(
@@ -118,27 +168,27 @@ impl Application {
             OperationOwner::new(second * 15)?.into_context(),
             cleanup,
             async move |scope| {
+                for initialize in initializers {
+                    initialize(scope).await?;
+                }
                 scope.stage("http.assemble")?;
-                let policy = RequestPolicy::new(admission, self.request_budget);
+                let policy = RequestPolicy::new(admission, request_budget);
                 #[cfg(feature = "actuator")]
-                let public = self
-                    .actuator
+                let public = actuator
                     .map(|plan| plan.register_in(scope, lifecycle))
                     .transpose()?;
                 #[cfg(feature = "actuator")]
                 if let Some(view) = public {
-                    let http = actuator::routes(view)?
-                        .assemble(policy, self.routes)
-                        .await?;
+                    let http = actuator::routes(view)?.assemble(policy, routes).await?;
                     scope.stage("http.bind")?;
-                    let listener = tokio::net::TcpListener::bind(self.address).await?;
+                    let listener = tokio::net::TcpListener::bind(address).await?;
                     let address = listener.local_addr()?;
                     http.register_in(scope, "http", listener)?;
                     return Ok::<_, ApplicationError>(address);
                 }
-                let http = HttpBoundary::new(policy).assemble(self.routes).await?;
+                let http = HttpBoundary::new(policy).assemble(routes).await?;
                 scope.stage("http.bind")?;
-                let listener = tokio::net::TcpListener::bind(self.address).await?;
+                let listener = tokio::net::TcpListener::bind(address).await?;
                 let address = listener.local_addr()?;
                 http.register_in(scope, "http", listener)?;
                 Ok::<_, ApplicationError>(address)

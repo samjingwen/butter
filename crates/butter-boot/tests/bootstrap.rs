@@ -2,7 +2,14 @@
 
 use butter_boot::Application;
 use butter_web::{ResponseConstructionBudget, Router, routing::get};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    net::SocketAddr,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -140,6 +147,140 @@ async fn startup_refuses_foreign_ports_and_legacy_paths_are_ordinary_application
 }
 
 #[tokio::test]
+async fn protected_initializers_run_before_bind_and_roll_back_in_lifo_order() {
+    let foreign = tokio::net::TcpListener::bind(loopback())
+        .await
+        .expect("own blocker");
+    let address = foreign.local_addr().expect("blocker address");
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let first = events.clone();
+    let second = events.clone();
+
+    let result = Application::new(Router::new())
+        .initialize(move |scope| {
+            Box::pin(async move {
+                first.lock().expect("events").push("initialize.first");
+                let slot = scope.reserve_cleanup("resource.first")?;
+                slot.register(move || async move {
+                    first.lock().expect("events").push("cleanup.first");
+                    Ok(())
+                });
+                Ok(())
+            })
+        })
+        .initialize(move |scope| {
+            Box::pin(async move {
+                second.lock().expect("events").push("initialize.second");
+                let slot = scope.reserve_cleanup("resource.second")?;
+                slot.register(move || async move {
+                    second.lock().expect("events").push("cleanup.second");
+                    Ok(())
+                });
+                Ok(())
+            })
+        })
+        .bind(address)
+        .start()
+        .await;
+
+    assert!(result.is_err(), "occupied listener must reject startup");
+    assert_eq!(
+        *events.lock().expect("events"),
+        [
+            "initialize.first",
+            "initialize.second",
+            "cleanup.second",
+            "cleanup.first",
+        ]
+    );
+    assert_eq!(foreign.local_addr().expect("blocker remains open"), address);
+}
+
+#[tokio::test]
+async fn initializer_failure_rolls_back_registered_resources_without_binding() {
+    let probe = tokio::net::TcpListener::bind(loopback())
+        .await
+        .expect("select address");
+    let address = probe.local_addr().expect("probe address");
+    drop(probe);
+    let cleaned = Arc::new(AtomicBool::new(false));
+    let cleanup = cleaned.clone();
+
+    let result = Application::new(Router::new())
+        .initialize(move |scope| {
+            Box::pin(async move {
+                let slot = scope.reserve_cleanup("resource")?;
+                slot.register(move || async move {
+                    cleanup.store(true, Ordering::SeqCst);
+                    Ok(())
+                });
+                Err(std::io::Error::other("synthetic initialization failure").into())
+            })
+        })
+        .bind(address)
+        .start()
+        .await;
+
+    assert!(result.is_err(), "initializer failure must propagate");
+    assert!(cleaned.load(Ordering::SeqCst), "resource must be closed");
+    let rebound = tokio::net::TcpListener::bind(address)
+        .await
+        .expect("initializer failed before listener binding");
+    drop(rebound);
+}
+
+#[tokio::test]
+async fn checked_shutdown_propagates_initializer_cleanup_failure() {
+    let running = Application::new(Router::new())
+        .initialize(|scope| {
+            Box::pin(async move {
+                scope.reserve_cleanup("resource")?.register(|| async {
+                    Err(std::io::Error::other("synthetic cleanup failure").into())
+                });
+                Ok(())
+            })
+        })
+        .bind(loopback())
+        .start()
+        .await
+        .expect("start");
+
+    assert!(
+        running.shutdown().await.is_err(),
+        "checked shutdown must retain cleanup failure"
+    );
+}
+
+#[tokio::test]
+async fn initializer_cleanup_is_bounded_by_the_application_policy() {
+    let entered = Arc::new(AtomicBool::new(false));
+    let cleanup = entered.clone();
+    let running = Application::new(Router::new())
+        .initialize(move |scope| {
+            Box::pin(async move {
+                scope
+                    .reserve_cleanup("resource")?
+                    .register(move || async move {
+                        cleanup.store(true, Ordering::SeqCst);
+                        std::future::pending::<()>().await;
+                        Ok(())
+                    });
+                Ok(())
+            })
+        })
+        .bind(loopback())
+        .start()
+        .await
+        .expect("start");
+
+    let result = tokio::time::timeout(Duration::from_secs(7), running.shutdown())
+        .await
+        .expect("cleanup policy must bound a non-terminating hook");
+    assert!(entered.load(Ordering::SeqCst), "cleanup hook must start");
+    assert!(result.is_err(), "timed-out cleanup must fail shutdown");
+}
+
+#[tokio::test]
 async fn request_construction_deadline_is_enforced_by_the_protected_boundary() {
     let router = Router::new().route("/", get(|| async { "healthy" })).route(
         "/slow",
@@ -174,6 +315,8 @@ async fn graceful_shutdown_waits_for_an_already_admitted_request() {
     let entered = Arc::new(tokio::sync::Notify::new());
     let release = Arc::new(tokio::sync::Notify::new());
     let (started, gate) = (entered.clone(), release.clone());
+    let cleaned = Arc::new(AtomicBool::new(false));
+    let cleanup = cleaned.clone();
     let router = Router::new().route(
         "/work",
         get(move || {
@@ -186,6 +329,17 @@ async fn graceful_shutdown_waits_for_an_already_admitted_request() {
         }),
     );
     let running = Application::new(router)
+        .initialize(move |scope| {
+            Box::pin(async move {
+                scope
+                    .reserve_cleanup("resource")?
+                    .register(move || async move {
+                        cleanup.store(true, Ordering::SeqCst);
+                        Ok(())
+                    });
+                Ok(())
+            })
+        })
         .bind(loopback())
         .start()
         .await
@@ -207,6 +361,10 @@ async fn graceful_shutdown_waits_for_an_already_admitted_request() {
         status.is_draining(),
         "drain started while the handler is held"
     );
+    assert!(
+        !cleaned.load(Ordering::SeqCst),
+        "resource cleanup must wait for admitted work"
+    );
     release.notify_one();
     assert!(
         request_task
@@ -217,4 +375,5 @@ async fn graceful_shutdown_waits_for_an_already_admitted_request() {
     shutdown
         .await
         .expect("checked drain after request completes");
+    assert!(cleaned.load(Ordering::SeqCst));
 }
